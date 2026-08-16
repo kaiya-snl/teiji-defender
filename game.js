@@ -310,9 +310,11 @@
   function freshState() {
     return {
       state: 'title', day: 0, hp: 100, maxHp: 100, coins: 0, runCoins: 0,
+      stageCoins: 0, // ステージ内通貨（敵ドロップ・ユニット強化用。ステージ終了時に恒常コインに変換）
       elapsed: 0, stageDuration: 80000, lunchActive: false, isExtraStage: false,
       entities: [], items: [], fx: [], bullets: [], drones: [], traps: [], explosions: [],
       ultGauge: 0, invincibleUntil: 0, slowUntil: 0, slowFactor: 1, coinBoostUntil: 0,
+      waveIndex: 0, waveTimer: 0, waveActive: false, wavePrep: 2500, // ウェーブ制
       spawnTimer: 600, itemTimer: 3000,
       bossActive: false, boss: null, bossPhaseIndex: -1,
       lectureActive: false, lectureTimer: 0,
@@ -320,7 +322,7 @@
       playerX: CW / 2, playerRecoil: 0,
       runLevel: 1, runExp: 0, choosingUpgrade: false,
       row: new Array(ROW_SLOTS.length).fill(null), dragSlot: -1, dragPos: null,
-      preparing: true, // 「業務開始」を押すまで敵は出現しない(体制を整える猶予)
+      preparing: true,
       rowDmgMul: 1, rowFireRateMul: 1,
       runBuffs: { critBonus: 0, coinMul: 1, pickupRange: 0, shield: 0 },
       partyAgg: freshPartyAggregate(), exEmpUsed: false, exEmpUntil: 0,
@@ -403,10 +405,14 @@
     S.maxHp += Math.round(S.partyAgg.maxHpBonus);
     S.hp = S.maxHp;
     deploySquad();
+    S.waveIndex = 0;
+    S.waveTimer = 0;
+    S.waveActive = false;
+    S.wavePrep = 2500;
     EL.bossDialogue.classList.add('hidden');
     EL.btnLectureSkip.classList.add('hidden');
     EL.levelupModal.classList.add('hidden');
-    EL.prepOverlay.classList.remove('hidden'); // 体制を整えるまで敵は来ない
+    EL.prepOverlay.classList.remove('hidden');
   }
 
   function beginStagePlay() {
@@ -419,7 +425,7 @@
   // ---------- HUD ----------
   function updateHUD() {
     EL.hudDay.textContent = S.isExtraStage ? '休日出勤' : `${MONTH_NAMES[monthIndex]}${weekInMonth + 1}週${DAY_SHORT[S.day]}`;
-    EL.hudCoins.textContent = `💰${S.coins}`;
+    EL.hudCoins.textContent = `業務P${S.stageCoins}`;
     EL.hudLevel.textContent = `Lv.${S.runLevel}`;
     const pct = Math.max(0, S.hp) / S.maxHp * 100;
     EL.hpInner.style.width = pct + '%';
@@ -491,18 +497,39 @@
     }
   }
 
+  // ウェーブ構成（敵タイプ・数）
+  const WAVES = [
+    [{ key: 'denwa', count: 2 }, { key: 'cc', count: 3 }],
+    [{ key: 'spec', count: 4 }, { key: 'cc', count: 2 }],
+    [{ key: 'nagabanashi', count: 1 }],
+    [{ key: 'error', count: 2 }, { key: 'spec', count: 3 }],
+    [{ key: 'kaigi', count: 2 }, { key: 'nagabanashi', count: 1 }],
+    [{ key: 'spec', count: 5 }, { key: 'error', count: 1 }],
+  ];
+
+  function startNextWave() {
+    if (S.waveIndex >= WAVES.length) return; // 全波終了
+    const wave = WAVES[S.waveIndex];
+    wave.forEach((spawn) => {
+      setTimeout(() => {
+        for (let i = 0; i < spawn.count; i++) {
+          setTimeout(() => { if (S.state === 'playing') spawnOne(spawn.key); }, i * 150);
+        }
+      }, 200);
+    });
+    S.waveIndex += 1;
+    S.waveTimer = 0;
+    S.waveActive = true;
+  }
+
   function maybeSpawnEnemy(dt) {
     if (S.lunchActive || S.bossActive || S.preparing) return;
-    S.spawnTimer -= dt;
-    if (S.spawnTimer <= 0) {
-      if (Math.random() < 0.12) {
-        spawnGroup('cc', 3 + Math.floor(Math.random() * 3));
-      } else {
-        spawnOne(pickWeighted(currentEnemyPool()));
-      }
-      const df = difficultyFactor();
-      const base = (Math.max(480, 1400 - df * 34)) / (S.isExtraStage ? 1.3 : 1);
-      S.spawnTimer = Math.max(280, base + (Math.random() * 400 - 200));
+    if (!S.waveActive && S.entities.length === 0 && S.waveIndex < WAVES.length) {
+      S.wavePrep -= dt;
+      if (S.wavePrep <= 0) { startNextWave(); S.wavePrep = 2500; }
+    } else if (S.waveActive && S.entities.length === 0) {
+      S.waveActive = false;
+      S.wavePrep = 2500;
     }
   }
 
@@ -609,20 +636,19 @@
     if (!def || !def.weaponType) return;
     const cost = unitLevelCost(u);
 
-    // 同じマスを2回タップしたら確定。1回目は表示のみ
     if (unitLevelUpConfirm !== idx) {
       unitLevelUpConfirm = idx;
-      spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 30, `💰${cost}で強化？`, '#ffd54f', 1200);
+      spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 30, `業務P${cost}で強化？`, '#ffd54f', 1200);
       setTimeout(() => { unitLevelUpConfirm = -1; }, 1500);
       return;
     }
     unitLevelUpConfirm = -1;
 
-    if (S.coins < cost) {
-      spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 30, `💰${cost}必要`, '#ff8a8a', 700);
+    if (S.stageCoins < cost) {
+      spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 30, `業務P${cost}必要`, '#ff8a8a', 700);
       return;
     }
-    S.coins -= cost;
+    S.stageCoins -= cost;
     updateHUD();
     openUnitLevelUp(idx, def);
   }
@@ -678,7 +704,7 @@
     let coin = e.coin;
     if (performance.now() < S.coinBoostUntil) coin *= 2;
     coin = Math.round(coin * S.runBuffs.coinMul * (1 + S.partyAgg.coinMul));
-    S.coins += coin; S.runCoins += coin;
+    S.stageCoins += coin; S.runCoins += coin;
     S.ultGauge = Math.min(100, S.ultGauge + 8 * (1 + S.partyAgg.ultGaugeMul));
     spawnFx(e.x, e.y, `+${coin}💰`, '#ffd54f');
     S.entities = S.entities.filter((x) => x !== e);
@@ -1112,6 +1138,18 @@
         ctx.setLineDash([]);
       }
       ctx.restore();
+      // 選択中のユニットの射程表示
+      if (S.dragSlot === i && u) {
+        const def = CHARACTERS.find((c) => c.key === u.key);
+        if (def && def.weaponType) {
+          ctx.strokeStyle = 'rgba(255,181,71,0.3)';
+          ctx.lineWidth = 2;
+          const range = def.weaponType === 'pierce' ? COL_W * 0.4 : COL_W * 0.55;
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, range, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
     });
     if (S.dragSlot >= 0 && S.dragPos && S.row[S.dragSlot]) {
       const u = S.row[S.dragSlot];
@@ -1123,6 +1161,27 @@
       if (def) ctx.fillText(def.icon, S.dragPos.x, S.dragPos.y);
       ctx.restore();
     }
+  }
+
+  function renderPartySupport() {
+    // 編成中のサポート型キャラを防衛ライン背後に表示
+    const supporters = party.filter((k) => {
+      const def = CHARACTERS.find((c) => c.key === k);
+      return def && !def.weaponType;
+    });
+    supporters.forEach((key, i) => {
+      const def = CHARACTERS.find((c) => c.key === key);
+      const x = (i + 1) * (CW / (supporters.length + 1));
+      const y = DEFENSE_LINE_Y + 20;
+      ctx.save();
+      ctx.fillStyle = 'rgba(159,216,255,0.3)';
+      circle(x, y, 16);
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      if (def) ctx.fillText(def.icon, x, y);
+      ctx.restore();
+    });
   }
 
   function render() {
@@ -1208,6 +1267,7 @@
     ctx.fillText('🧑‍💻', 0, 0);
     ctx.restore();
 
+    renderPartySupport();
     renderRow();
 
     if (S.bossActive && S.boss) {
@@ -1264,7 +1324,10 @@
     }
     S.state = 'stageclear';
     EL.clearMsg.textContent = STAGE_CLEAR_LINES[S.day] || 'お疲れ様でした。';
-    EL.clearCoins.textContent = S.runCoins;
+    const bonus = Math.round(S.stageCoins * 0.5); // ステージコイン50%をボーナスに変換
+    S.coins += bonus;
+    EL.clearCoins.textContent = S.runCoins + bonus;
+    saveProgress();
     showScreen('screen-stage-clear');
   }
 
