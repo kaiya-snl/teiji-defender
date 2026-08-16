@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>定時退社ディフェンダー</title>
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 
@@ -66,6 +66,12 @@
 
       <!-- 説教スクロール中に連打するボタン（ボス専用ギミック） -->
       <button id="btn-lecture-skip" class="hidden">はい、すみません（連打）</button>
+
+      <!-- 開始直後の準備フェーズ。押すまで敵は来ない。合体などを先に済ませられる -->
+      <div id="prep-overlay" class="hidden">
+        <p class="prep-note">体制を整えたら開始しましょう<br>（同じ仲間・同じLvをドラッグで合体できます）</p>
+        <button id="btn-start-work" class="btn-primary">業務開始</button>
+      </div>
 
       <!-- 下部操作バー -->
       <div id="action-bar">
@@ -190,6 +196,6 @@
   <!-- ===== 広告枠（下部バナー） ===== -->
   <div id="ad-bottom" class="ad-slot">広告枠（下部バナー / ここに AdSense 等のタグを設置）</div>
 
-  <script src="game.js?v=14"></script>
+  <script src="game.js?v=16"></script>
 </body>
 </html>

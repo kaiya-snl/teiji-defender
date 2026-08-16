@@ -23,6 +23,7 @@
     canvas: $('game-canvas'),
     bossDialogue: $('boss-dialogue'), bossDialogueName: $('boss-dialogue-name'), bossDialogueText: $('boss-dialogue-text'),
     btnLectureSkip: $('btn-lecture-skip'),
+    prepOverlay: $('prep-overlay'), btnStartWork: $('btn-start-work'),
     btnUltimate: $('btn-ultimate'), ultGauge: $('ult-gauge-inner'),
     btnOpenShop: $('btn-open-shop'), btnPause: $('btn-pause'),
     shopCoins: $('shop-coins'), shopList: $('shop-list'), btnShopClose: $('btn-shop-close'),
@@ -317,6 +318,7 @@
       playerX: CW / 2, playerRecoil: 0,
       runLevel: 1, runExp: 0, choosingUpgrade: false,
       row: new Array(ROW_SLOTS.length).fill(null), unitSpawnTimer: 1200, dragSlot: -1, dragPos: null,
+      preparing: true, // 「業務開始」を押すまで敵は出現しない(体制を整える猶予)
       rowDmgMul: 1, rowFireRateMul: 1, rowSpawnRateMul: 1,
       runBuffs: { critBonus: 0, coinMul: 1, pickupRange: 0, shield: 0 },
       partyAgg: freshPartyAggregate(), exEmpUsed: false, exEmpUntil: 0,
@@ -398,9 +400,11 @@
     S.partyAgg = computePartyAggregate();
     S.maxHp += Math.round(S.partyAgg.maxHpBonus);
     S.hp = S.maxHp;
+    prefillRow();
     EL.bossDialogue.classList.add('hidden');
     EL.btnLectureSkip.classList.add('hidden');
     EL.levelupModal.classList.add('hidden');
+    EL.prepOverlay.classList.remove('hidden'); // 体制を整えるまで敵は来ない
   }
 
   function beginStagePlay() {
@@ -486,7 +490,7 @@
   }
 
   function maybeSpawnEnemy(dt) {
-    if (S.lunchActive || S.bossActive) return;
+    if (S.lunchActive || S.bossActive || S.preparing) return;
     S.spawnTimer -= dt;
     if (S.spawnTimer <= 0) {
       if (Math.random() < 0.12) {
@@ -699,6 +703,18 @@
     return pool.length ? pool : ['ace'];
   }
 
+  // ステージ開始時、列を空っぽのまま敵の猛攻にさらすと理不尽なので、あらかじめ2体だけ配置しておく。
+  // 「体制を整えてから業務開始」。所持レベルをそのまま反映する。
+  function prefillRow() {
+    const pool = spawnPoolKeys();
+    const slots = [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5).slice(0, Math.min(2, ROW_SLOTS.length));
+    slots.forEach((idx) => {
+      const key = pool[Math.floor(Math.random() * pool.length)];
+      const owned = roster[key];
+      S.row[idx] = { key, level: owned ? owned.level : 1, timer: 400 };
+    });
+  }
+
   function maybeSpawnUnit(dt) {
     S.unitSpawnTimer -= dt;
     if (S.unitSpawnTimer > 0) return;
@@ -905,6 +921,7 @@
 
   function update(dt) {
     if (S.choosingUpgrade) return; // レベルアップ選択中はゲームを完全停止
+    if (S.preparing) return; // 「業務開始」を押すまでは時間経過も敵出現も止める
     S.elapsed += dt;
     updateClockAndLunch();
     if (!S.isExtraStage && S.day === 4) updateBossTrigger();
@@ -1136,6 +1153,7 @@
       ctx.fillText(f.text, f.x, f.y);
       ctx.globalAlpha = 1;
     }
+
   }
 
   function loop(ts) {
@@ -1472,6 +1490,10 @@
   // ---------- イベント登録 ----------
   EL.btnStart.addEventListener('click', () => { S.day = 0; S.isExtraStage = false; goStageIntro(); });
   EL.btnStageGo.addEventListener('click', beginStagePlay);
+  EL.btnStartWork.addEventListener('click', () => {
+    S.preparing = false;
+    EL.prepOverlay.classList.add('hidden');
+  });
   EL.btnOpenShopTitle.addEventListener('click', () => openShop('title'));
   EL.btnOpenShop.addEventListener('click', () => openShop('playing'));
   EL.btnOpenShopPause.addEventListener('click', () => openShop('pause'));
