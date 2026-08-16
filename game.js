@@ -556,7 +556,7 @@
 
   function maybeSpawnEnemy(dt) {
     if (S.lunchActive || S.bossActive || S.preparing) return;
-    if (!S.waveActive && S.entities.length === 0 && S.waveIndex < S.waves.length) {
+    if (!S.waveActive && S.entities.length === 0 && S.waveIndex < (S.waves?.length || 0)) {
       S.wavePrep -= dt;
       if (S.wavePrep <= 0) { startNextWave(); S.wavePrep = 2500; }
     } else if (S.waveActive && S.entities.length === 0) {
