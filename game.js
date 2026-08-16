@@ -512,37 +512,31 @@
     }
   }
 
-  // ウェーブ生成（難度対応・毎回異なる敵構成）
+  // ウェーブ構成（難度対応）
   function generateWaves(dayIndex) {
-    const basicPool = ['spec', 'denwa', 'cc'];
-    const midPool = ['error', 'kaigi', 'nagabanashi'];
-    const advPool = ['keiyaku', 'jishin', 'pawaham'];
-    const complexPool = ['zenin', 'kangyoushoku', 'houkoku', 'jikantakushoku', 'shoriairon', 'netsuabuse'];
+    const waveConfigs = [
+      [{ key: 'spec', count: 3 }, { key: 'cc', count: 2 }],
+      [{ key: 'spec', count: 4 }, { key: 'denwa', count: 2 }],
+      [{ key: 'error', count: 2 }, { key: 'cc', count: 3 }],
+      [{ key: 'kaigi', count: 1 }, { key: 'spec', count: 3 }],
+      [{ key: 'nagabanashi', count: 1 }, { key: 'error', count: 2 }],
+      [{ key: 'spec', count: 5 }],
+    ];
 
-    let availablePool = [...basicPool];
-    if (dayIndex >= 1) availablePool = availablePool.concat(midPool);
-    if (dayIndex >= 3) availablePool = availablePool.concat(advPool);
-    if (dayIndex >= 4) availablePool = availablePool.concat(complexPool);
-
-    const waves = [];
-    for (let w = 0; w < 6; w++) {
-      const waveNum = w + 1;
-      const enemyCount = 2 + waveNum + Math.floor(dayIndex * 1.5);
-      const wave = [];
-
-      // 1波: 敵少数・単一タイプ、6波: 敵多数・混合
-      const numEnemyTypes = w === 0 ? 1 : Math.min(2 + Math.floor(w / 2), 3);
-      let remaining = enemyCount;
-
-      for (let i = 0; i < numEnemyTypes && remaining > 0; i++) {
-        const key = availablePool[Math.floor(Math.random() * availablePool.length)];
-        const count = i === numEnemyTypes - 1 ? remaining : Math.max(1, Math.floor(remaining / (numEnemyTypes - i)));
-        wave.push({ key, count });
-        remaining -= count;
-      }
-      waves.push(wave);
+    // 難度に応じた敵変更
+    if (dayIndex >= 1) {
+      waveConfigs[1] = [{ key: 'error', count: 3 }, { key: 'kaigi', count: 2 }];
+      waveConfigs[2] = [{ key: 'nagabanashi', count: 1 }, { key: 'spec', count: 4 }];
     }
-    return waves;
+    if (dayIndex >= 3) {
+      waveConfigs[3] = [{ key: 'keiyaku', count: 1 }, { key: 'error', count: 3 }];
+      waveConfigs[4] = [{ key: 'jishin', count: 2 }, { key: 'spec', count: 2 }];
+    }
+    if (dayIndex >= 4) {
+      waveConfigs[5] = [{ key: 'pawaham', count: 1 }, { key: 'nagabanashi', count: 2 }];
+    }
+
+    return waveConfigs;
   }
 
   function startNextWave() {
