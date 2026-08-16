@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>定時退社ディフェンダー</title>
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
 
@@ -20,7 +20,7 @@
     <div id="screen-title" class="screen">
       <h1>定時退社ディフェンダー</h1>
       <p class="tagline">迫りくる理不尽な業務から、あなたのメンタルを守り抜け。</p>
-      <p class="desc">仲間は自動で列に並んで戦う。同じ仲間・同じLvを指でドラッグして重ねると合体して強化！<br>月〜金、5日分のステージ。金曜日には最大の脅威が待ち受ける……</p>
+      <p class="desc">編成した仲間（最大5人）の攻撃タイプが陣地に配置されて自動で戦う。倒した敵のコインでユニットを個別にタップしてレベルアップ！<br>月〜金、5日分のステージ。金曜日には最大の脅威が待ち受ける……</p>
       <button id="btn-start" class="btn-primary">出社する（スタート）</button>
       <div class="title-sub">
         <span id="title-bestday">最高記録: -</span>
@@ -67,9 +67,9 @@
       <!-- 説教スクロール中に連打するボタン（ボス専用ギミック） -->
       <button id="btn-lecture-skip" class="hidden">はい、すみません（連打）</button>
 
-      <!-- 開始直後の準備フェーズ。押すまで敵は来ない。合体などを先に済ませられる -->
+      <!-- 開始直後の準備フェーズ。押すまで敵は来ない。配置の入れ替えなどを先に済ませられる -->
       <div id="prep-overlay" class="hidden">
-        <p class="prep-note">体制を整えたら開始しましょう<br>（同じ仲間・同じLvをドラッグで合体できます）</p>
+        <p class="prep-note">体制を整えたら開始しましょう<br>（ドラッグで配置換え、同じマスをタップでコインを使ってレベルアップ）</p>
         <button id="btn-start-work" class="btn-primary">業務開始</button>
       </div>
 
@@ -96,8 +96,8 @@
     <div id="screen-roster" class="screen hidden">
       <h2>仲間編成・採用</h2>
       <p class="shop-coins">所持コイン: <span id="roster-coins">0</span> 💰</p>
-      <p class="roster-party-count">特性選抜: <span id="roster-party-count">0</span>/3（タップで編成/解除）</p>
-      <p class="roster-party-hint">⚡「列で自動攻撃」のキャラは所持していれば自動で戦闘に出ます。ここで選ぶのは🎗️「特性のみ」の仲間による常時効果（回復・コイン増加など）です。</p>
+      <p class="roster-party-count">出撃編成: <span id="roster-party-count">0</span>/5（タップで編成/解除）</p>
+      <p class="roster-party-hint">⚡「列で自動攻撃」のキャラは編成に入れると実際に陣地へ配置されて戦います。🎗️「特性のみ」のキャラは編成に入れると常時効果（回復・コイン増加など）を発揮します。</p>
       <p class="roster-test-note">🔧 テスト版のため、ガチャは今だけ無料・無制限で回せます</p>
       <div id="roster-gacha-bar">
         <button id="btn-gacha-pull" class="btn-primary">採用面接する<br><span class="gacha-btn-sub">1回（無料・テスト版）</span></button>
@@ -196,6 +196,6 @@
   <!-- ===== 広告枠（下部バナー） ===== -->
   <div id="ad-bottom" class="ad-slot">広告枠（下部バナー / ここに AdSense 等のタグを設置）</div>
 
-  <script src="game.js?v=16"></script>
+  <script src="game.js?v=17"></script>
 </body>
 </html>

@@ -3,9 +3,9 @@
    Canvas 2D + バニラJSのみ（外部ライブラリなし）。
    内部解像度は 360x480 固定。CSS側で表示サイズを可変にし、
    タップ座標は getBoundingClientRect の比率で内部座標へ変換する。
-   ジャンル: タワーディフェンス。編成した仲間（最大3人）はレーンごとに固定位置へ配置され、
-   キャラの得意武器で自動的に戦う。自キャラは陣地（防衛ライン付近）に固定で自前の武器を持ち、
-   タップした敵には少量の直接ダメージ（応援攻撃）を与えられる。
+   ジャンル: タワーディフェンス。編成した仲間（最大5人）のうち攻撃タイプは3x3マスの陣地へ
+   自動配置され、得意武器で戦う。倒した敵のコインでユニットを個別にタップしてレベルアップでき、
+   その都度3択で追跡・速度アップ等の強化を選べる。自キャラはタップで応援攻撃ができる。
    進行: 4月〜3月の12ヶ月×4週、各週は月〜金＋金曜ボス。週クリア後ランダムで「休日出勤」が挟まる。
    ========================================================== */
 (function () {
@@ -55,12 +55,14 @@
   // 防衛ラインはユニット列(後列y=290)のすぐ後ろに設定。間延びした無防備地帯を作らない。
   const DEFENSE_LINE_Y = 330; // 防衛ライン。ここを敵が越えるとダメージ
   const PLAYER_Y = 352; // 自キャラ(=自分自身。HPの象徴)の立ち位置。もう攻撃はしない
-  // マージキャノン方式のユニット配置スロット(3レーン×前後2列=6マス)。
-  // レーン中心Xに揃えることで、そのまま自動攻撃の当たり判定(レーン基準)を使い回せる。
+  // ユニット配置スロット(3レーン×前中後3列=9マス)。編成した攻撃タイプはここへ配置される。
+  // 行優先（前列を横に埋めてから次の列へ）にしておくと、少人数編成でもレーンに分散して並ぶ。
+  const ROW_Y = [130, 210, 290];
   const ROW_SLOTS = [];
-  for (let _lane = 0; _lane < COLS; _lane++) {
-    ROW_SLOTS.push({ x: _lane * COL_W + COL_W / 2, y: 210 });
-    ROW_SLOTS.push({ x: _lane * COL_W + COL_W / 2, y: 290 });
+  for (const _ry of ROW_Y) {
+    for (let _lane = 0; _lane < COLS; _lane++) {
+      ROW_SLOTS.push({ x: _lane * COL_W + COL_W / 2, y: _ry });
+    }
   }
   EL.canvas.width = CW; EL.canvas.height = CH;
 
@@ -92,7 +94,7 @@
   // 恒常強化（コイン購入・日をまたいで引き継ぐ）
   const UPGRADES = [
     { key: 'pc',        name: '高スペックPC',               icon: '💻', desc: '列にいる全ユニットの攻撃力アップ',   baseCost: 20, costMul: 1.6, effectPerLv: 3,  maxLv: 12 },
-    { key: 'monitor',   name: 'デュアルモニター',           icon: '🖥️', desc: '新戦力の出現間隔が短くなる',         baseCost: 35, costMul: 1.8, maxLv: 3 },
+    { key: 'monitor',   name: 'デュアルモニター',           icon: '🖥️', desc: '配置ユニット全体の攻撃間隔が短くなる', baseCost: 35, costMul: 1.8, effectPerLv: 3, maxLv: 10 },
     { key: 'tool',      name: '有償ツール',                 icon: '🛠️', desc: '列にいる全ユニットの会心率アップ',   baseCost: 25, costMul: 1.7, effectPerLv: 8,  maxLv: 10 },
     { key: 'headphone', name: 'ノイズキャンセリングイヤホン', icon: '🎧', desc: '「上司の長話」の被ダメを軽減',       baseCost: 30, costMul: 1.7, effectPerLv: 10, maxLv: 8 },
   ];
@@ -110,7 +112,7 @@
   // ---------- 仲間(社員)システム: 20種、採用ガチャで収集し最大5人編成 ----------
   // apply(a, s): 編成中の効果を集計オブジェクト a に加算/乗算する。s はダブり数から算出したレベル倍率。
   const GACHA_COST = 40; // コインガチャ1回のコスト
-  const PARTY_MAX = 3; // 編成できる仲間の最大人数
+  const PARTY_MAX = 5; // 編成(出撃メンバー)できる仲間の最大人数。攻撃タイプは実際に陣地へ配置される
   const ROLE_LABEL = { atk: '⚔️アタッカー', def: '🛡️ディフェンダー', sup: '💖サポーター', trick: '🃏トリックスター' };
   // 季節限定キャラ用の自作SVGアイコン（外部画像を使わず自前で描画）
   const ART_GAL =
@@ -151,22 +153,22 @@
 
   const CHARACTERS = [
     { key: 'ace', name: '新人エース', role: 'atk', rarity: 'SR', icon: '🌱', weaponType: 'basic',
-      desc: '列に出現するとブラインドタッチ型の攻撃。稀に攻撃が敵を回復させてしまう',
+      desc: '配置されるとブラインドタッチ型の攻撃。稀に攻撃が敵を回復させてしまう',
       apply: (a, s) => { a.basicFireRateMul *= (1 - 0.05 * s); a.whiffHealChance += 0.015 * s; } },
     { key: 'excel', name: 'エクセル職人', role: 'atk', rarity: 'R', icon: '📊', weaponType: 'bomb',
-      desc: '列に出現するとマクロ爆撃(範囲攻撃)。全体の爆撃威力もアップ',
+      desc: '配置されるとマクロ爆撃(範囲攻撃)。全体の爆撃威力もアップ',
       apply: (a, s) => { a.bombRadiusMul += 0.08 * s; a.bombDmgMul += 0.10 * s; } },
     { key: 'typing', name: 'タイピングの鬼', role: 'def', rarity: 'SSR', icon: '⌨️', weaponType: 'basic',
-      desc: '列に出現すると超高火力の単体攻撃。全ユニットの攻撃力も底上げ',
+      desc: '配置されると超高火力の単体攻撃。全ユニットの攻撃力も底上げ',
       apply: (a, s) => { a.allDmgMul += 0.10 * s; } },
     { key: 'gorilla', name: '営業のゴリラ', role: 'atk', rarity: 'R', icon: '🦍', weaponType: 'knock',
-      desc: '列に出現すると敵を吹き飛ばすノックバック攻撃',
+      desc: '配置されると敵を吹き飛ばすノックバック攻撃',
       apply: (a, s) => { a.knockDistMul += 0.10 * s; a.knockIntervalMul *= (1 - 0.06 * s); } },
     { key: 'kikoku', name: '帰国子女エンジニア', role: 'atk', rarity: 'SR', icon: '🌐', weaponType: 'pierce',
-      desc: '出現した列を貫通するビーム攻撃。「謎のエラー」に特効',
+      desc: '配置された列を貫通するビーム攻撃。「謎のエラー」に特効',
       apply: (a, s) => { a.errorDmgMul += 0.25 * s; } },
     { key: 'legend', name: '伝説の派遣社員', role: 'sup', rarity: 'SSR', icon: '🕶️', weaponType: 'basic',
-      desc: '列に出現すると全方位に強い攻撃。全ユニットの攻撃力アップだが毎秒コインを消費',
+      desc: '配置されると全方位に強い攻撃。全ユニットの攻撃力アップだが毎秒コインを消費',
       apply: (a, s) => { a.allDmgMul += 0.12 * s; a.coinDrainPerSec += 0.4 * s; } },
     { key: 'otsubone', name: 'ベテランお局様', role: 'def', rarity: 'SR', icon: '👓', weaponType: 'freeze',
       desc: '近くの敵を睨みで足止め。高Lvで完全ストップも',
@@ -212,10 +214,10 @@
       desc: '1ステージにつき1回、必殺技発動時に数秒だけ大幅強化される',
       apply: (a, s) => { a.exEmpScale = Math.max(a.exEmpScale, s); } },
     { key: 'gal', name: '水着ギャルエリート', role: 'atk', rarity: 'SSR', icon: '👙', art: ART_GAL, seasonal: '🌺夏季限定', weaponType: 'basic',
-      desc: '列に出現すると「それな」「ASAPで」等のギャル語レーザー連射。陽キャオーラで全体の敵HPもじわじわ削る',
+      desc: '配置されると「それな」「ASAPで」等のギャル語レーザー連射。陽キャオーラで全体の敵HPもじわじわ削る',
       apply: (a, s) => { a.allDmgMul += 0.14 * s; a.extraLaneBonus = Math.max(a.extraLaneBonus, s >= 6 ? 1 : 0); a.uwasaDmgPerSec += 1.2 * s; } },
     { key: 'bbq', name: '肉焼き奉行', role: 'atk', rarity: 'SR', icon: '🥩', art: ART_BBQ, seasonal: '🌺夏季限定', weaponType: 'bomb',
-      desc: '列に出現すると熱々の炭を投げて範囲ダメージ。高級和牛パワーで全体攻撃力アップ(その分HPを消費)',
+      desc: '配置されると熱々の炭を投げて範囲ダメージ。高級和牛パワーで全体攻撃力アップ(その分HPを消費)',
       apply: (a, s) => { a.bombRadiusMul += 0.10 * s; a.bombDmgMul += 0.14 * s; a.allDmgMul += 0.05 * s; a.hpDrainPerSec += 0.15 * s; } },
   ];
 
@@ -309,7 +311,7 @@
     return {
       state: 'title', day: 0, hp: 100, maxHp: 100, coins: 0, runCoins: 0,
       elapsed: 0, stageDuration: 80000, lunchActive: false, isExtraStage: false,
-      entities: [], items: [], fx: [], bullets: [], bombs: [], drones: [], traps: [], explosions: [],
+      entities: [], items: [], fx: [], bullets: [], drones: [], traps: [], explosions: [],
       ultGauge: 0, invincibleUntil: 0, slowUntil: 0, slowFactor: 1, coinBoostUntil: 0,
       spawnTimer: 600, itemTimer: 3000,
       bossActive: false, boss: null, bossPhaseIndex: -1,
@@ -317,9 +319,9 @@
       shopReturn: 'title', lastTime: 0,
       playerX: CW / 2, playerRecoil: 0,
       runLevel: 1, runExp: 0, choosingUpgrade: false,
-      row: new Array(ROW_SLOTS.length).fill(null), unitSpawnTimer: 1200, dragSlot: -1, dragPos: null,
+      row: new Array(ROW_SLOTS.length).fill(null), dragSlot: -1, dragPos: null,
       preparing: true, // 「業務開始」を押すまで敵は出現しない(体制を整える猶予)
-      rowDmgMul: 1, rowFireRateMul: 1, rowSpawnRateMul: 1,
+      rowDmgMul: 1, rowFireRateMul: 1,
       runBuffs: { critBonus: 0, coinMul: 1, pickupRange: 0, shield: 0 },
       partyAgg: freshPartyAggregate(), exEmpUsed: false, exEmpUntil: 0,
     };
@@ -400,7 +402,7 @@
     S.partyAgg = computePartyAggregate();
     S.maxHp += Math.round(S.partyAgg.maxHpBonus);
     S.hp = S.maxHp;
-    prefillRow();
+    deploySquad();
     EL.bossDialogue.classList.add('hidden');
     EL.btnLectureSkip.classList.add('hidden');
     EL.levelupModal.classList.add('hidden');
@@ -541,9 +543,8 @@
 
   // レベルアップ選択は「列のユニット全体」を強化する方向に統一（自キャラ個人の武器は廃止）。
   const ROW_LEVEL_CARDS = [
-    { icon: '💥', name: '全ユニット攻撃力アップ', desc: '列にいる全ユニットの攻撃力が上がる', apply: () => { S.rowDmgMul += 0.15; } },
-    { icon: '⚡', name: '全ユニット攻撃速度アップ', desc: '列にいる全ユニットの攻撃間隔が短くなる', apply: () => { S.rowFireRateMul *= 0.9; } },
-    { icon: '🆕', name: '新戦力アップ', desc: '新しいユニットが出現する間隔が短くなる', apply: () => { S.rowSpawnRateMul *= 0.85; } },
+    { icon: '💥', name: '全ユニット攻撃力アップ', desc: '配置中の全ユニットの攻撃力が上がる', apply: () => { S.rowDmgMul += 0.15; } },
+    { icon: '⚡', name: '全ユニット攻撃速度アップ', desc: '配置中の全ユニットの攻撃間隔が短くなる', apply: () => { S.rowFireRateMul *= 0.9; } },
   ];
 
   function buildLevelUpPool() {
@@ -554,6 +555,7 @@
   }
 
   function openLevelUp() {
+    if (S.choosingUpgrade) return; // ユニット個別レベルアップ選択中は割り込まない
     S.choosingUpgrade = true;
     const pool = buildLevelUpPool();
     const picks = [];
@@ -582,13 +584,77 @@
     updateHUD();
   }
 
+  // ---------- ユニット個別レベルアップ(コイン消費・タップで購入) ----------
+  // 汎用強化は全武器タイプ共通、それ以外は該当武器タイプのユニットにだけ提示する。
+  const UNIT_PERKS = [
+    { key: 'dmg', weapon: null, icon: '💥', name: '威力アップ', desc: 'このユニットの攻撃力+20%', apply: (u) => { u.dmgMul *= 1.2; } },
+    { key: 'spd', weapon: null, icon: '⚡', name: 'スピードアップ', desc: 'このユニットの攻撃間隔が短くなる', apply: (u) => { u.frMul *= 0.85; } },
+    { key: 'crit', weapon: null, icon: '✨', name: '会心率アップ', desc: 'このユニットの会心率+15%', apply: (u) => { u.critBonus += 15; } },
+    { key: 'homing', weapon: 'basic', icon: '🎯', name: '追跡装備', desc: '弾が近くの敵を追尾するようになる', apply: (u) => { u.homing = true; } },
+    { key: 'pierce', weapon: 'pierce', icon: '📎', name: '貫通強化', desc: 'ビームの貫通幅が広がる', apply: (u) => { u.pierceBonus += 0.3; } },
+    { key: 'radius', weapon: 'bomb', icon: '💣', name: '爆風拡大', desc: '爆撃の範囲が広がる', apply: (u) => { u.radiusBonus += 16; } },
+    { key: 'knock', weapon: 'knock', icon: '🌀', name: '吹き飛ばし強化', desc: 'ノックバック距離が伸びる', apply: (u) => { u.knockBonus += 20; } },
+    { key: 'freeze', weapon: 'freeze', icon: '🧊', name: '足止め強化', desc: '完全ストップの確率が上がる', apply: (u) => { u.freezeBonus += 10; } },
+  ];
+
+  function unitLevelCost(u) { return 25 + u.bonusLevel * 18; }
+
+  function tryLevelUpUnit(idx) {
+    if (S.choosingUpgrade) return;
+    const u = S.row[idx];
+    if (!u) return;
+    const def = CHARACTERS.find((c) => c.key === u.key);
+    if (!def || !def.weaponType) return;
+    const cost = unitLevelCost(u);
+    if (S.coins < cost) {
+      spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 30, `💰${cost}必要`, '#ff8a8a', 700);
+      return;
+    }
+    S.coins -= cost;
+    updateHUD();
+    openUnitLevelUp(idx, def);
+  }
+
+  function openUnitLevelUp(idx, def) {
+    S.choosingUpgrade = true;
+    const pool = UNIT_PERKS.filter((p) => !p.weapon || p.weapon === def.weaponType).slice();
+    const picks = [];
+    for (let i = 0; i < 3 && pool.length; i++) {
+      const pick = Math.floor(Math.random() * pool.length);
+      picks.push(pool.splice(pick, 1)[0]);
+    }
+    EL.levelupChoices.innerHTML = '';
+    picks.forEach((card) => {
+      const btn = document.createElement('button');
+      btn.className = 'levelup-choice';
+      btn.innerHTML =
+        `<div class="levelup-choice-icon">${card.icon}</div>` +
+        `<div><div class="levelup-choice-name">${card.name}</div><div class="levelup-choice-desc">${card.desc}</div></div>`;
+      btn.addEventListener('click', () => applyUnitPerkChoice(idx, card));
+      EL.levelupChoices.appendChild(btn);
+    });
+    EL.levelupModal.classList.remove('hidden');
+  }
+
+  function applyUnitPerkChoice(idx, card) {
+    EL.levelupModal.classList.add('hidden');
+    S.choosingUpgrade = false;
+    const u = S.row[idx];
+    if (!u) return; // 選択中にユニットが消えることは通常ないが念のため
+    u.bonusLevel += 1;
+    u.level += 1;
+    card.apply(u);
+    spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 30, `${card.icon}Lv${u.level}!`, '#ffd54f', 1100);
+    updateHUD();
+  }
+
   // ---------- ダメージ計算(全ユニット共通) ----------
-  function computeAttackDamage(baseDmg) {
+  function computeAttackDamage(baseDmg, extraCritChance) {
     const pcU = UPGRADES.find((u) => u.key === 'pc');
     const toolU = UPGRADES.find((u) => u.key === 'tool');
     let dmg = (baseDmg + upgrades.pc * pcU.effectPerLv) * (1 + S.partyAgg.allDmgMul);
     if (S.exEmpUntil && performance.now() < S.exEmpUntil) dmg *= (1 + S.partyAgg.exEmpScale);
-    const critChance = Math.min(80, upgrades.tool * toolU.effectPerLv + S.runBuffs.critBonus);
+    const critChance = Math.min(80, upgrades.tool * toolU.effectPerLv + S.runBuffs.critBonus + (extraCritChance || 0));
     let crit = false;
     if (Math.random() * 100 < critChance) { dmg *= 2; crit = true; }
     return { dmg: Math.round(dmg), crit };
@@ -606,7 +672,7 @@
     updateHUD();
   }
 
-  function hitEnemy(e, baseDmg) {
+  function hitEnemy(e, baseDmg, extraCritChance) {
     if (S.partyAgg.whiffHealChance > 0 && Math.random() < S.partyAgg.whiffHealChance) {
       const heal = Math.round(baseDmg * 0.5);
       e.hp = Math.min(e.maxHp, e.hp + heal);
@@ -614,7 +680,7 @@
       return;
     }
     if (e.key === 'error') baseDmg *= (1 + S.partyAgg.errorDmgMul);
-    const { dmg, crit } = computeAttackDamage(baseDmg);
+    const { dmg, crit } = computeAttackDamage(baseDmg, extraCritChance);
     e.hp -= dmg; e.flash = 120;
     spawnFx(e.x, e.y - 16, crit ? `会心!-${dmg}` : `-${dmg}`, crit ? '#ffdd55' : '#fff');
     if (e.hp <= 0) killEnemy(e);
@@ -664,7 +730,7 @@
     updateHUD();
   }
 
-  // ---------- タップ応援攻撃・ユニットのドラッグ合体 ----------
+  // ---------- タップ応援攻撃・ユニットのドラッグ配置換え ----------
   function canvasPos(clientX, clientY) {
     const rect = EL.canvas.getBoundingClientRect();
     return { x: (clientX - rect.left) * (CW / rect.width), y: (clientY - rect.top) * (CH / rect.height) };
@@ -682,10 +748,11 @@
     if (target) hitEnemy(target, tapDmg);
   }
 
-  // ---------- マージキャノン方式の仲間ユニット列 ----------
-  // 所持キャラがランダムに列(6マス)へ出現し、同じキャラ&同じLvをドラッグで合体させると
-  // 1段階強いユニットになる（Pumpkin Defense: Merge Cannon を参考）。
-  // 武器タイプを持つキャラはその場から自動攻撃し、持たないキャラ(サポート系)はオーラのみ。
+  // ---------- 配置(タワーディフェンス)方式の仲間ユニット ----------
+  // 編成(party、最大5人)のうち「攻撃タイプ」を持つキャラだけが陣地(9マス)へ自動配置される。
+  // ランダム出現・合体は廃止し、編成した本人がそのまま戦場に立つ形にした。
+  // 配置後はドラッグで位置を入れ替え可能。同じマスでタップするとコインを消費して
+  // そのユニットだけを個別レベルアップでき、都度3択で強化を選べる。
   function slotAt(x, y) {
     for (let i = 0; i < ROW_SLOTS.length; i++) {
       if (Math.hypot(x - ROW_SLOTS[i].x, y - ROW_SLOTS[i].y) < 24) return i;
@@ -693,53 +760,32 @@
     return -1;
   }
 
-  // 列に出現するのは「攻撃タイプを持つ所持キャラ」全員から。サポート型は編成(party)でオーラ専任にする
-  // ことで、列のマスが常に攻撃ユニットで埋まるようにする（サポート型が枠を無駄にしないため）。
-  function spawnPoolKeys() {
-    const pool = Object.keys(roster).filter((k) => {
+  function makeUnit(key, level) {
+    return {
+      key, level, timer: 300, bonusLevel: 0,
+      dmgMul: 1, frMul: 1, critBonus: 0, pierceBonus: 0, radiusBonus: 0, knockBonus: 0, freezeBonus: 0, homing: false,
+    };
+  }
+
+  // ステージ開始時、編成した攻撃タイプ全員を陣地へ配置する。誰も攻撃タイプを持たない場合
+  // (未編成・未採用の新規プレイヤー等)は救済として新人エースを1体だけ配置する。
+  function deploySquad() {
+    S.row = new Array(ROW_SLOTS.length).fill(null);
+    const attackers = party.filter((k) => {
       const def = CHARACTERS.find((c) => c.key === k);
       return def && def.weaponType;
     });
-    return pool.length ? pool : ['ace'];
-  }
-
-  // ステージ開始時、列を空っぽのまま敵の猛攻にさらすと理不尽なので、あらかじめ2体だけ配置しておく。
-  // 「体制を整えてから業務開始」。所持レベルをそのまま反映する。
-  function prefillRow() {
-    const pool = spawnPoolKeys();
-    const slots = [0, 1, 2, 3, 4, 5].sort(() => Math.random() - 0.5).slice(0, Math.min(2, ROW_SLOTS.length));
-    slots.forEach((idx) => {
-      const key = pool[Math.floor(Math.random() * pool.length)];
+    attackers.forEach((key, i) => {
+      if (i >= ROW_SLOTS.length) return;
       const owned = roster[key];
-      S.row[idx] = { key, level: owned ? owned.level : 1, timer: 400 };
+      S.row[i] = makeUnit(key, owned ? owned.level : 1);
     });
-  }
-
-  function maybeSpawnUnit(dt) {
-    S.unitSpawnTimer -= dt;
-    if (S.unitSpawnTimer > 0) return;
-    const emptyIdx = [];
-    S.row.forEach((u, i) => { if (!u) emptyIdx.push(i); });
-    if (emptyIdx.length === 0) { S.unitSpawnTimer = 600; return; }
-    const monitorMul = 1 - Math.min(0.5, upgrades.monitor * 0.12);
-    S.unitSpawnTimer = (4000 + Math.random() * 1400) * S.rowSpawnRateMul * monitorMul;
-    // 合体が狙いやすくなるよう、6割の確率で「今すでに列にいるキャラ」と同じものを優先的に出す。
-    const pool = spawnPoolKeys();
-    const inRowKeys = S.row.filter((u) => u).map((u) => u.key);
-    let key;
-    if (inRowKeys.length && Math.random() < 0.6) {
-      key = inRowKeys[Math.floor(Math.random() * inRowKeys.length)];
-    } else {
-      key = pool[Math.floor(Math.random() * pool.length)];
-    }
-    const idx = emptyIdx[Math.floor(Math.random() * emptyIdx.length)];
-    // 所持レベル(ガチャで育てたLv)をそのまま列での初期Lvとして反映する。
-    const owned = roster[key];
-    S.row[idx] = { key, level: owned ? owned.level : 1, timer: 200 };
-    spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 28, '新戦力!', '#8fbf6a', 700);
+    if (attackers.length === 0) S.row[0] = makeUnit('ace', roster.ace ? roster.ace.level : 1);
   }
 
   function updateRowUnits(dt) {
+    const monitorU = UPGRADES.find((u) => u.key === 'monitor');
+    const monitorMul = 1 - Math.min(0.4, upgrades.monitor * monitorU.effectPerLv / 100);
     S.row.forEach((u, i) => {
       if (!u) return;
       const def = CHARACTERS.find((c) => c.key === u.key);
@@ -748,29 +794,33 @@
       if (u.timer > 0) return;
       const lv = u.level;
       const pos = ROW_SLOTS[i];
-      let frMul = S.rowFireRateMul * S.partyAgg.basicFireRateMul;
+      const dmgMul = S.rowDmgMul * u.dmgMul;
+      let frMul = S.rowFireRateMul * S.partyAgg.basicFireRateMul * monitorMul * u.frMul;
       if (S.partyAgg.dashScale > 0 && !S.isExtraStage && S.elapsed / S.stageDuration > 0.7) {
         frMul *= Math.max(0.3, 1 - 0.5 * S.partyAgg.dashScale);
       }
       if (def.weaponType === 'basic') {
         u.timer = Math.max(260, (850 - lv * 55) * frMul);
-        S.bullets.push({ kind: 'basic', x: pos.x, y: pos.y - 16, dmgBase: (8 + lv * 5) * S.rowDmgMul, hitSet: new Set() });
+        S.bullets.push({ kind: 'basic', x: pos.x, y: pos.y - 16, dmgBase: (8 + lv * 5) * dmgMul, critBonus: u.critBonus, homing: u.homing, hitSet: new Set() });
       } else if (def.weaponType === 'pierce') {
         u.timer = Math.max(900, (2000 - lv * 85) * frMul);
-        S.bullets.push({ kind: 'pierce', x: pos.x, y: pos.y - 16, dmgBase: (12 + lv * 6) * S.rowDmgMul, halfWidth: COL_W * 0.4, hitSet: new Set() });
+        S.bullets.push({ kind: 'pierce', x: pos.x, y: pos.y - 16, dmgBase: (12 + lv * 6) * dmgMul, critBonus: u.critBonus, halfWidth: COL_W * (0.4 + u.pierceBonus), hitSet: new Set() });
       } else if (def.weaponType === 'bomb') {
         u.timer = Math.max(1100, (2300 - lv * 110) * frMul);
-        S.bombs.push({ x: pos.x, y: pos.y - 16, dmgBase: (14 + lv * 7) * S.rowDmgMul, radius: 46 + lv * 9 });
+        const radius = 46 + lv * 9 + u.radiusBonus;
+        spawnExplosion(pos.x, pos.y, radius, '255,140,60');
+        for (const e of S.entities) { if (Math.hypot(e.x - pos.x, e.y - pos.y) < radius) hitEnemy(e, (14 + lv * 7) * dmgMul, u.critBonus); }
+        if (S.bossActive && S.boss && S.boss.hp > 0 && Math.hypot(CW / 2 - pos.x, 110 - pos.y) < radius) hitBoss((14 + lv * 7) * dmgMul, u.critBonus);
       } else if (def.weaponType === 'knock') {
         u.timer = Math.max(1200, (3000 - lv * 190) * frMul);
-        const dist = 48 + lv * 15;
+        const dist = 48 + lv * 15 + u.knockBonus;
         for (const e of S.entities) { if (Math.abs(e.x - pos.x) < COL_W * 0.55 && e.y > pos.y) e.y = Math.max(20, e.y - dist); }
         spawnExplosion(pos.x, pos.y, 40 + dist, '255,181,71');
       } else if (def.weaponType === 'freeze') {
         u.timer = Math.max(1100, (2400 - lv * 95) * frMul);
         const target = S.entities.filter((e) => Math.abs(e.x - pos.x) < COL_W * 0.55).sort((a, b) => b.y - a.y)[0];
         if (target) {
-          const freezeChance = lv >= 8 ? 0.4 : 0;
+          const freezeChance = (lv >= 8 ? 0.4 : 0) + u.freezeBonus / 100;
           const full = Math.random() < freezeChance;
           target.slowUntil = performance.now() + (1200 + lv * 200);
           target.slowMul = full ? 0 : 0.35;
@@ -781,7 +831,7 @@
         if (S.traps.filter((tr) => Math.abs(tr.x - pos.x) < 10).length < maxCount) {
           u.timer = 1300;
           const dur = 3800 + lv * 500;
-          S.traps.push({ x: pos.x, y: pos.y + 44, life: dur, maxLife: dur, tickTimer: 0, dmg: 4 + lv * 1.6 });
+          S.traps.push({ x: pos.x, y: pos.y + 44, life: dur, maxLife: dur, tickTimer: 0, dmg: (4 + lv * 1.6) * dmgMul });
         } else {
           u.timer = 500;
         }
@@ -884,10 +934,10 @@
     }
   }
 
-  function hitBoss(baseDmg) {
+  function hitBoss(baseDmg, extraCritChance) {
     if (!S.boss || S.boss.hp <= 0) return;
     if (S.lectureActive && Math.random() < 0.5) { spawnFx(CW / 2, 190, '届かない…', '#888', 600); return; }
-    const { dmg, crit } = computeAttackDamage(baseDmg);
+    const { dmg, crit } = computeAttackDamage(baseDmg, extraCritChance);
     S.boss.hp -= dmg;
     spawnFx(CW / 2, 130, crit ? `会心!-${dmg}` : `-${dmg}`, crit ? '#ffdd55' : '#fff', 700);
     if (S.boss.hp <= 0) defeatBoss();
@@ -928,7 +978,6 @@
     if (S.bossActive) updateBoss(dt); else maybeSpawnEnemy(dt);
     maybeSpawnItem(dt);
 
-    maybeSpawnUnit(dt);
     updateRowUnits(dt);
     updatePartyTicks(dt);
 
@@ -967,6 +1016,15 @@
     for (let i = S.bullets.length - 1; i >= 0; i--) {
       const b = S.bullets[i];
       b.y -= (b.kind === 'pierce' ? 420 : 520) * dt / 1000;
+      if (b.homing) {
+        let target = null, bestDist = 999;
+        for (const e of S.entities) {
+          if (b.hitSet.has(e)) continue;
+          const d = Math.hypot(b.x - e.x, b.y - e.y);
+          if (d < bestDist) { bestDist = d; target = e; }
+        }
+        if (target) b.x += Math.max(-4, Math.min(4, target.x - b.x)) * (dt / 16);
+      }
       let consumed = false;
       const halfW = b.kind === 'pierce' ? b.halfWidth : null;
       for (const e of S.entities) {
@@ -974,12 +1032,12 @@
         const w2 = halfW !== null ? halfW : (e.w / 2 + 12);
         if (Math.abs(b.x - e.x) < w2 && Math.abs(b.y - e.y) < 16) {
           b.hitSet.add(e);
-          hitEnemy(e, b.dmgBase);
+          hitEnemy(e, b.dmgBase, b.critBonus);
           if (b.kind !== 'pierce') { consumed = true; break; }
         }
       }
       if (!consumed && S.bossActive && S.boss && S.boss.hp > 0 && b.y <= 150) {
-        hitBoss(b.dmgBase);
+        hitBoss(b.dmgBase, b.critBonus);
         if (b.kind !== 'pierce') consumed = true;
       }
       if (consumed || b.y < -20) S.bullets.splice(i, 1);
@@ -1026,6 +1084,12 @@
         ctx.font = 'bold 10px sans-serif';
         ctx.fillStyle = '#ffd54f';
         ctx.fillText(`Lv${u.level}`, pos.x, pos.y + 27);
+        if (def && def.weaponType) {
+          const cost = unitLevelCost(u);
+          ctx.font = '9px sans-serif';
+          ctx.fillStyle = S.coins >= cost ? '#8fbf6a' : 'rgba(255,255,255,0.35)';
+          ctx.fillText(`タップ💰${cost}`, pos.x, pos.y - 27);
+        }
       } else {
         ctx.setLineDash([3, 3]);
         ctx.strokeStyle = 'rgba(255,255,255,0.16)';
@@ -1106,10 +1170,6 @@
         ctx.fillRect(b.x - 2, b.y - 9, 4, 16);
       }
     }
-
-    // マクロ爆撃
-    ctx.font = '20px sans-serif';
-    for (const bomb of S.bombs) { ctx.fillText('📧', bomb.x, bomb.y); }
 
     // AIアシスタント(ドローン)
     ctx.font = '18px sans-serif';
@@ -1521,8 +1581,9 @@
     if (S.lectureTimer <= 0) endLecture();
   });
 
-  // 操作: ユニットスロットを掴んでドラッグ→同じキャラ&同じLvの上に離すと合体。
-  // 空きスロットに離せば移動、違うユニットの上に離せば入れ替え。スロット外のタップは応援攻撃。
+  // 操作: ユニットスロットを掴んでドラッグ→別マスで離すと配置換え(入れ替え)。
+  // 同じマスでそのまま離す(=タップ)とコインを消費してそのユニットを個別レベルアップ。
+  // スロット外のタップは応援攻撃。
   EL.canvas.addEventListener('pointerdown', (ev) => {
     ev.preventDefault();
     if (S.state !== 'playing') return;
@@ -1547,21 +1608,13 @@
     S.dragSlot = -1;
     S.dragPos = null;
     const targetIdx = slotAt(x, y);
-    if (targetIdx < 0 || targetIdx === srcIdx) return;
+    if (targetIdx < 0) return;
+    if (targetIdx === srcIdx) { tryLevelUpUnit(srcIdx); return; }
     const src = S.row[srcIdx];
     const tgt = S.row[targetIdx];
     if (!src) return;
-    if (!tgt) {
-      S.row[targetIdx] = src;
-      S.row[srcIdx] = null;
-    } else if (tgt.key === src.key && tgt.level === src.level) {
-      S.row[targetIdx] = { key: src.key, level: src.level + 1, timer: 200 };
-      S.row[srcIdx] = null;
-      spawnFx(ROW_SLOTS[targetIdx].x, ROW_SLOTS[targetIdx].y - 30, `合体! Lv.${src.level + 1}`, '#ffd54f', 1000);
-    } else {
-      S.row[targetIdx] = src;
-      S.row[srcIdx] = tgt;
-    }
+    S.row[targetIdx] = src;
+    S.row[srcIdx] = tgt || null;
   });
   window.addEventListener('pointercancel', () => { S.dragSlot = -1; S.dragPos = null; });
 
