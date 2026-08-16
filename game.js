@@ -2,9 +2,10 @@
    定時退社ディフェンダー - ゲーム本体
    Canvas 2D + バニラJSのみ（外部ライブラリなし）。
    内部解像度は 360x480 固定。CSS側で表示サイズを可変にし、
-   タップ/ドラッグ座標は getBoundingClientRect の比率で内部座標へ変換する。
-   操作: 指で左右に動かす=移動のみ（自キャラのXは連続値・14マス等の固定グリッドではない）。
-   攻撃は武器システムによる自動連射・自動発動。詳細は WEAPONS を参照。
+   タップ座標は getBoundingClientRect の比率で内部座標へ変換する。
+   ジャンル: タワーディフェンス。編成した仲間（最大3人）はレーンごとに固定位置へ配置され、
+   キャラの得意武器で自動的に戦う。自キャラは陣地（防衛ライン付近）に固定で自前の武器を持ち、
+   タップした敵には少量の直接ダメージ（応援攻撃）を与えられる。
    進行: 4月〜3月の12ヶ月×4週、各週は月〜金＋金曜ボス。週クリア後ランダムで「休日出勤」が挟まる。
    ========================================================== */
 (function () {
@@ -51,7 +52,8 @@
   const ctx = EL.canvas.getContext('2d');
   const CW = 360, CH = 480, COLS = 3, COL_W = CW / COLS;
   const DEFENSE_LINE_Y = 420; // 防衛ライン。ここを敵が越えるとダメージ
-  const PLAYER_Y = DEFENSE_LINE_Y - 24; // 自キャラの立ち位置(縦)
+  const PLAYER_Y = DEFENSE_LINE_Y - 24; // 自キャラの立ち位置(縦・固定)
+  const TOWER_ROW_Y = 250; // 編成した仲間が並ぶ列(縦・固定)。自キャラより前線寄り
   EL.canvas.width = CW; EL.canvas.height = CH;
 
   const DAY_NAMES = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日'];
@@ -177,26 +179,26 @@
     '</svg>';
 
   const CHARACTERS = [
-    { key: 'ace', name: '新人エース', role: 'atk', rarity: 'SR', icon: '🌱',
-      desc: '攻撃速度アップ。稀に攻撃が敵を回復させてしまう',
+    { key: 'ace', name: '新人エース', role: 'atk', rarity: 'SR', icon: '🌱', weaponType: 'basic',
+      desc: '配置レーンでブラインドタッチ型の攻撃。稀に攻撃が敵を回復させてしまう',
       apply: (a, s) => { a.basicFireRateMul *= (1 - 0.05 * s); a.whiffHealChance += 0.015 * s; } },
-    { key: 'excel', name: 'エクセル職人', role: 'atk', rarity: 'R', icon: '📊',
-      desc: 'マクロ爆撃(VBAボム)の範囲・威力アップ',
+    { key: 'excel', name: 'エクセル職人', role: 'atk', rarity: 'R', icon: '📊', weaponType: 'bomb',
+      desc: '配置レーンでマクロ爆撃(範囲攻撃)。全体の爆撃威力もアップ',
       apply: (a, s) => { a.bombRadiusMul += 0.08 * s; a.bombDmgMul += 0.10 * s; } },
-    { key: 'typing', name: 'タイピングの鬼', role: 'def', rarity: 'SSR', icon: '⌨️',
-      desc: '全武器の攻撃力が大幅アップ',
+    { key: 'typing', name: 'タイピングの鬼', role: 'def', rarity: 'SSR', icon: '⌨️', weaponType: 'basic',
+      desc: '配置レーンで超高火力の単体攻撃。全武器の攻撃力も底上げ',
       apply: (a, s) => { a.allDmgMul += 0.10 * s; } },
-    { key: 'gorilla', name: '営業のゴリラ', role: 'atk', rarity: 'R', icon: '🦍',
-      desc: 'ちゃぶ台返しウェーブの威力・頻度アップ',
+    { key: 'gorilla', name: '営業のゴリラ', role: 'atk', rarity: 'R', icon: '🦍', weaponType: 'knock',
+      desc: '配置レーンで敵を吹き飛ばすノックバック攻撃',
       apply: (a, s) => { a.knockDistMul += 0.10 * s; a.knockIntervalMul *= (1 - 0.06 * s); } },
-    { key: 'kikoku', name: '帰国子女エンジニア', role: 'atk', rarity: 'SR', icon: '🌐',
-      desc: '「謎のエラー」への特効ダメージ',
+    { key: 'kikoku', name: '帰国子女エンジニア', role: 'atk', rarity: 'SR', icon: '🌐', weaponType: 'pierce',
+      desc: '配置レーンを貫通するビーム攻撃。「謎のエラー」に特効',
       apply: (a, s) => { a.errorDmgMul += 0.25 * s; } },
-    { key: 'legend', name: '伝説の派遣社員', role: 'sup', rarity: 'SSR', icon: '🕶️',
-      desc: '全武器の攻撃力アップ。ただし編成中は毎秒コインを消費',
+    { key: 'legend', name: '伝説の派遣社員', role: 'sup', rarity: 'SSR', icon: '🕶️', weaponType: 'basic',
+      desc: '配置レーンで全方位に強い攻撃。全武器の攻撃力アップだが毎秒コインを消費',
       apply: (a, s) => { a.allDmgMul += 0.12 * s; a.coinDrainPerSec += 0.4 * s; } },
-    { key: 'otsubone', name: 'ベテランお局様', role: 'def', rarity: 'SR', icon: '👓',
-      desc: '「リスケ」フリーズの発動間隔短縮・完全停止確率アップ',
+    { key: 'otsubone', name: 'ベテランお局様', role: 'def', rarity: 'SR', icon: '👓', weaponType: 'freeze',
+      desc: '配置レーンの敵を睨みで足止め。高Lvで完全ストップも',
       apply: (a, s) => { a.freezeIntervalMul *= (1 - 0.06 * s); a.freezeChanceBonus += 0.03 * s; } },
     { key: 'sekinin', name: '責任逃れの上司', role: 'def', rarity: 'R', icon: '🙈',
       desc: '被弾を確率で丸ごとブロック',
@@ -207,8 +209,8 @@
     { key: 'claim', name: 'クレーム対応のプロ', role: 'def', rarity: 'R', icon: '📞',
       desc: '被ダメージ軽減',
       apply: (a, s) => { a.incomingDmgMul *= (1 - 0.03 * s); } },
-    { key: 'houmu', name: '法務部の守護神', role: 'def', rarity: 'SR', icon: '⚖️',
-      desc: 'アウトソーシングの設置数・持続時間アップ',
+    { key: 'houmu', name: '法務部の守護神', role: 'def', rarity: 'SR', icon: '⚖️', weaponType: 'trap',
+      desc: '配置レーンにトラップを設置。設置数・持続時間もアップ',
       apply: (a, s) => { if (s >= 6) a.trapMaxCountBonus = Math.max(a.trapMaxCountBonus, 1); a.trapDurationMul += 0.08 * s; } },
     { key: 'soumu', name: '癒やしの総務女子', role: 'sup', rarity: 'R', icon: '🍵',
       desc: 'HPが少しずつ回復する',
@@ -238,11 +240,11 @@
     { key: 'exemp', name: '辞めた優秀な元社員', role: 'trick', rarity: 'R', icon: '🚪',
       desc: '1ステージにつき1回、必殺技発動時に数秒だけ大幅強化される',
       apply: (a, s) => { a.exEmpScale = Math.max(a.exEmpScale, s); } },
-    { key: 'gal', name: '水着ギャルエリート', role: 'atk', rarity: 'SSR', icon: '👙', art: ART_GAL, seasonal: '🌺夏季限定',
-      desc: '「それな」「ASAPで」等のギャル語レーザーで超広範囲を攻撃。陽キャオーラで敵のHPをじわじわ削る',
+    { key: 'gal', name: '水着ギャルエリート', role: 'atk', rarity: 'SSR', icon: '👙', art: ART_GAL, seasonal: '🌺夏季限定', weaponType: 'basic',
+      desc: '配置レーンで「それな」「ASAPで」等のギャル語レーザー連射。陽キャオーラで全体の敵HPもじわじわ削る',
       apply: (a, s) => { a.allDmgMul += 0.14 * s; a.extraLaneBonus = Math.max(a.extraLaneBonus, s >= 6 ? 1 : 0); a.uwasaDmgPerSec += 1.2 * s; } },
-    { key: 'bbq', name: '肉焼き奉行', role: 'atk', rarity: 'SR', icon: '🥩', art: ART_BBQ, seasonal: '🌺夏季限定',
-      desc: '熱々の炭を投げて範囲ダメージ。高級和牛パワーで攻撃力アップ(その分HPを消費)',
+    { key: 'bbq', name: '肉焼き奉行', role: 'atk', rarity: 'SR', icon: '🥩', art: ART_BBQ, seasonal: '🌺夏季限定', weaponType: 'bomb',
+      desc: '配置レーンで熱々の炭を投げて範囲ダメージ。高級和牛パワーで全体攻撃力アップ(その分HPを消費)',
       apply: (a, s) => { a.bombRadiusMul += 0.10 * s; a.bombDmgMul += 0.14 * s; a.allDmgMul += 0.05 * s; a.hpDrainPerSec += 0.15 * s; } },
   ];
 
@@ -344,10 +346,10 @@
       bossActive: false, boss: null, bossPhaseIndex: -1,
       lectureActive: false, lectureTimer: 0,
       shopReturn: 'title', lastTime: 0,
-      playerX: CW / 2, dragging: false, playerRecoil: 0, laserActive: false,
+      playerX: CW / 2, playerRecoil: 0, laserActive: false,
       runLevel: 1, runExp: 0, choosingUpgrade: false,
       weapons: { basic: { level: 1, timer: 300 } },
-      partyTickTimers: [], partyFx: [],
+      towers: [],
       runBuffs: { critBonus: 0, coinMul: 1, pickupRange: 0, shield: 0 },
       partyAgg: freshPartyAggregate(), exEmpUsed: false, exEmpUntil: 0,
     };
@@ -428,6 +430,7 @@
     S.partyAgg = computePartyAggregate();
     S.maxHp += Math.round(S.partyAgg.maxHpBonus);
     S.hp = S.maxHp;
+    initTowers();
     EL.bossDialogue.classList.add('hidden');
     EL.btnLectureSkip.classList.add('hidden');
     EL.levelupModal.classList.add('hidden');
@@ -699,11 +702,21 @@
     updateHUD();
   }
 
-  // ---------- 自キャラの移動 ----------
-  function movePlayerTo(clientX) {
+  // ---------- タップ応援攻撃 ----------
+  // 自キャラ・仲間タワーは固定位置で自動的に戦う。タップは敵に少量の直接ダメージを与える
+  // 補助的な操作（プレイヤーが「自分も参加してる」と感じられるように）。
+  function handleTapDamage(clientX, clientY) {
     const rect = EL.canvas.getBoundingClientRect();
     const x = (clientX - rect.left) * (CW / rect.width);
-    S.playerX = Math.max(20, Math.min(CW - 20, x));
+    const y = (clientY - rect.top) * (CH / rect.height);
+    const tapDmg = 5 + upgrades.pc * 1;
+    if (S.bossActive && S.boss && Math.hypot(x - CW / 2, y - 110) < 50) { hitBoss(tapDmg); return; }
+    let target = null, best = 999;
+    for (const e of S.entities) {
+      const d = Math.hypot(x - e.x, y - e.y);
+      if (d < e.w + 16 && d < best) { best = d; target = e; }
+    }
+    if (target) hitEnemy(target, tapDmg);
   }
 
   // ---------- 武器システム: 発射・更新処理 ----------
@@ -879,6 +892,66 @@
     updateWeaponKnock(dt);
   }
 
+  // ---------- タワー(配置した仲間)システム ----------
+  // 編成中の仲間(最大3人)は左から順にレーン0,1,2に固定配置される。
+  // weaponTypeを持つキャラは自分のレーンで自動攻撃し、持たないキャラ(サポート系)は
+  // その場に立ってオーラ効果(partyAgg経由、updatePartyTicks等で処理済み)を出すだけ。
+  function initTowers() {
+    S.towers = party.map((key, i) => {
+      const def = CHARACTERS.find((c) => c.key === key);
+      const owned = roster[key];
+      return {
+        key, lane: i, x: i * COL_W + COL_W / 2, y: TOWER_ROW_Y,
+        weaponType: def ? def.weaponType : null,
+        level: owned ? owned.level : 1,
+        timer: 300 + i * 150,
+      };
+    });
+  }
+
+  function updateTowers(dt) {
+    for (const t of S.towers) {
+      if (!t.weaponType) continue; // サポート型は自ら攻撃しない
+      t.timer -= dt;
+      const lv = t.level;
+      if (t.timer > 0) continue;
+      if (t.weaponType === 'basic') {
+        t.timer = Math.max(280, 900 - lv * 60);
+        S.bullets.push({ kind: 'basic', x: t.x, y: t.y - 16, dmgBase: 9 + lv * 4, hitSet: new Set() });
+      } else if (t.weaponType === 'pierce') {
+        t.timer = Math.max(1000, 2200 - lv * 90);
+        S.bullets.push({ kind: 'pierce', x: t.x, y: t.y - 16, dmgBase: 13 + lv * 5, halfWidth: COL_W * 0.42, hitSet: new Set() });
+      } else if (t.weaponType === 'bomb') {
+        t.timer = Math.max(1200, 2400 - lv * 120);
+        S.bombs.push({ x: t.x, y: t.y - 16, dmgBase: 15 + lv * 6, radius: 48 + lv * 8 });
+      } else if (t.weaponType === 'knock') {
+        t.timer = Math.max(1300, 3200 - lv * 200);
+        const dist = 50 + lv * 14;
+        for (const e of S.entities) { if (Math.abs(e.x - t.x) < COL_W * 0.6 && e.y > t.y) e.y = Math.max(20, e.y - dist); }
+        spawnExplosion(t.x, t.y, 40 + dist, '255,181,71');
+      } else if (t.weaponType === 'freeze') {
+        t.timer = Math.max(1200, 2600 - lv * 100);
+        const target = S.entities.filter((e) => Math.abs(e.x - t.x) < COL_W * 0.6).sort((a, b) => b.y - a.y)[0];
+        if (target) {
+          const freezeChance = lv >= 8 ? 0.4 : 0;
+          const full = Math.random() < freezeChance;
+          target.slowUntil = performance.now() + (1200 + lv * 200);
+          target.slowMul = full ? 0 : 0.35;
+          spawnFx(target.x, target.y - 20, full ? 'ストップ!' : 'リスケ…', '#8fe3ff', 700);
+        }
+      } else if (t.weaponType === 'trap') {
+        const maxCount = 1 + Math.floor(lv / 4);
+        if (S.traps.filter((tr) => Math.abs(tr.x - t.x) < 10).length < maxCount) {
+          t.timer = 1400;
+          const dur = 4000 + lv * 500;
+          S.traps.push({ x: t.x, y: t.y + 50, life: dur, maxLife: dur, tickTimer: 0, dmg: 4 + lv * 1.5 });
+        } else {
+          t.timer = 500;
+        }
+      }
+    }
+  }
+
   // ---------- 編成中の仲間による継続効果(回復/コイン消費/HP消費/社内ニート発動/うわさ話) ----------
   function updatePartyTicks(dt) {
     const a = S.partyAgg;
@@ -1019,8 +1092,8 @@
 
     if (S.playerRecoil > 0) S.playerRecoil -= dt;
     updateWeapons(dt);
+    updateTowers(dt);
     updatePartyTicks(dt);
-    updatePartyVisualTicks(dt);
 
     const slow = performance.now() < S.slowUntil ? S.slowFactor : 1;
     for (let i = S.entities.length - 1; i >= 0; i--) {
@@ -1088,66 +1161,46 @@
   // ---------- 描画 ----------
   function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
 
-  // 編成中の仲間を自陣（防衛ラインの下）に並べて表示する。空き枠は点線の「+」で見せる。
-  // 数値バフだけでは「仲間になった感じがしない」との指摘があったため、
-  // 各キャラの位置から定期的に小さな攻撃演出(上方向の光弾)も飛ばす。
-  function renderPartyRow() {
-    const y = DEFENSE_LINE_Y + 36;
-    const spacing = 48;
-    const startX = CW / 2 - ((PARTY_MAX - 1) * spacing) / 2;
+  // 編成中の仲間(タワー)をレーン上の固定位置に描画する。
+  // weaponTypeを持つキャラは足元にプラットフォームを、持たないサポート系は
+  // 脈打つオーラの輪を表示して「何かしている感」を出す。空きレーンは点線の「+」。
+  function renderTowers() {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (let i = 0; i < PARTY_MAX; i++) {
-      const x = startX + i * spacing;
-      const key = party[i];
-      if (key) {
-        const def = CHARACTERS.find((c) => c.key === key);
-        const bob = Math.sin(performance.now() / 320 + i * 1.7) * 2;
+    for (let lane = 0; lane < COLS; lane++) {
+      const x = lane * COL_W + COL_W / 2;
+      const t = S.towers[lane];
+      if (t) {
+        const def = CHARACTERS.find((c) => c.key === t.key);
+        const bob = Math.sin(performance.now() / 320 + lane * 1.7) * 2;
+        const y = TOWER_ROW_Y + bob;
         ctx.save();
-        ctx.fillStyle = 'rgba(255,181,71,0.2)';
-        circle(x, y + bob, 19);
-        ctx.strokeStyle = 'rgba(255,181,71,0.85)';
-        ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(x, y + bob, 19, 0, Math.PI * 2); ctx.stroke();
-        ctx.font = '22px sans-serif';
-        if (def) ctx.fillText(def.icon, x, y + bob);
-        ctx.restore();
-        const fx = S.partyFx.find((f) => f.slot === i);
-        if (fx) {
-          const t = 1 - fx.life / fx.maxLife;
-          ctx.save();
-          ctx.globalAlpha = Math.max(0, 1 - t);
-          ctx.fillStyle = '#8fe3ff';
-          circle(x, (y + bob) - t * 90, 3);
-          ctx.restore();
+        if (t.weaponType) {
+          ctx.fillStyle = 'rgba(255,181,71,0.22)';
+          circle(x, y, 21);
+          ctx.strokeStyle = 'rgba(255,181,71,0.9)';
+        } else {
+          const pulse = 0.5 + Math.sin(performance.now() / 260) * 0.5;
+          ctx.fillStyle = `rgba(159,216,255,${0.12 + pulse * 0.1})`;
+          circle(x, y, 21 + pulse * 3);
+          ctx.strokeStyle = 'rgba(159,216,255,0.8)';
         }
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x, y, 21, 0, Math.PI * 2); ctx.stroke();
+        ctx.font = '24px sans-serif';
+        if (def) ctx.fillText(def.icon, x, y);
+        ctx.restore();
       } else {
         ctx.save();
         ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.16)';
         ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(x, y, 19, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, TOWER_ROW_Y, 21, 0, Math.PI * 2); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = 'rgba(255,255,255,0.3)';
-        ctx.font = '16px sans-serif';
-        ctx.fillText('+', x, y);
+        ctx.fillStyle = 'rgba(255,255,255,0.28)';
+        ctx.font = '18px sans-serif';
+        ctx.fillText('+', x, TOWER_ROW_Y);
         ctx.restore();
       }
-    }
-  }
-
-  function updatePartyVisualTicks(dt) {
-    while (S.partyTickTimers.length < party.length) S.partyTickTimers.push(800 + Math.random() * 1200);
-    S.partyTickTimers.length = party.length;
-    for (let i = 0; i < party.length; i++) {
-      S.partyTickTimers[i] -= dt;
-      if (S.partyTickTimers[i] <= 0) {
-        S.partyTickTimers[i] = 1300 + Math.random() * 1300;
-        S.partyFx.push({ slot: i, life: 300, maxLife: 300 });
-      }
-    }
-    for (let i = S.partyFx.length - 1; i >= 0; i--) {
-      S.partyFx[i].life -= dt;
-      if (S.partyFx[i].life <= 0) S.partyFx.splice(i, 1);
     }
   }
 
@@ -1249,7 +1302,7 @@
     ctx.fillText('🧑‍💻', 0, 0);
     ctx.restore();
 
-    renderPartyRow();
+    renderTowers();
 
     if (S.bossActive && S.boss) {
       ctx.font = '64px sans-serif';
@@ -1631,20 +1684,12 @@
     if (S.lectureTimer <= 0) endLecture();
   });
 
-  // 操作: 押した位置へ即座に移動＋ドラッグ追従（攻撃は全武器とも自動）
+  // 操作: 自キャラ・仲間タワーは固定位置で自動的に戦う。タップは応援攻撃（少量の直接ダメージ）。
   EL.canvas.addEventListener('pointerdown', (ev) => {
     ev.preventDefault();
     if (S.state !== 'playing') return;
-    S.dragging = true;
-    movePlayerTo(ev.clientX);
+    handleTapDamage(ev.clientX, ev.clientY);
   });
-  EL.canvas.addEventListener('pointermove', (ev) => {
-    if (!S.dragging || S.state !== 'playing') return;
-    ev.preventDefault();
-    movePlayerTo(ev.clientX);
-  });
-  window.addEventListener('pointerup', () => { S.dragging = false; });
-  window.addEventListener('pointercancel', () => { S.dragging = false; });
 
   // ---------- 起動 ----------
   loadSave();
