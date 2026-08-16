@@ -418,7 +418,11 @@
     S.maxHp += Math.round(S.partyAgg.maxHpBonus);
     S.hp = S.maxHp;
     deploySquad();
-    S.spawnTimer = 600;
+    S.waves = generateWaves(S.day);
+    S.waveIndex = 0;
+    S.waveTimer = 0;
+    S.waveActive = false;
+    S.wavePrep = 2500;
     EL.bossDialogue.classList.add('hidden');
     EL.btnLectureSkip.classList.add('hidden');
     EL.levelupModal.classList.add('hidden');
@@ -430,8 +434,6 @@
     S.state = 'playing';
     showScreen('screen-playing');
     updateHUD();
-    // 敵出現テスト用
-    setTimeout(() => { if (S.state === 'playing') spawnOne('spec'); }, 1000);
   }
 
   // ---------- HUD ----------
@@ -495,7 +497,7 @@
     const spMul = 1 + Math.min(1.4, df * 0.028);
     const extraMul = S.isExtraStage ? 1.35 : 1;
     S.entities.push({
-      key, lane, x: lane * COL_W + COL_W / 2, y: 60,
+      key, lane, x: lane * COL_W + COL_W / 2, y: -24,
       hp: Math.round(def.hp * hpMul * extraMul), maxHp: Math.round(def.hp * hpMul * extraMul),
       speed: def.speed * spMul * extraMul, dmg: def.dmg, coin: def.coin, w: def.w,
       zigzag: !!def.zigzag, zigT: Math.random() * Math.PI * 2, flash: 0,
@@ -554,16 +556,12 @@
 
   function maybeSpawnEnemy(dt) {
     if (S.lunchActive || S.bossActive || S.preparing) return;
-    S.spawnTimer -= dt;
-    if (S.spawnTimer <= 0) {
-      const pool = ['spec', 'denwa', 'cc', 'error'];
-      if (S.day >= 1) pool.push('kaigi', 'nagabanashi');
-      if (S.day >= 2) pool.push('jishin');
-      if (S.day >= 3) pool.push('keiyaku', 'pawaham');
-      if (S.day >= 4) pool.push('zenin', 'houkoku');
-      const key = pool[Math.floor(Math.random() * pool.length)];
-      spawnOne(key);
-      S.spawnTimer = 800;
+    if (!S.waveActive && S.entities.length === 0 && S.waveIndex < (S.waves?.length || 0)) {
+      S.wavePrep -= dt;
+      if (S.wavePrep <= 0) { startNextWave(); S.wavePrep = 2500; }
+    } else if (S.waveActive && S.entities.length === 0) {
+      S.waveActive = false;
+      S.wavePrep = 2500;
     }
   }
 
