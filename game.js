@@ -53,7 +53,7 @@
   const CW = 360, CH = 480, COLS = 3, COL_W = CW / COLS;
   // 防衛ラインはユニット列(後列y=290)のすぐ後ろに設定。間延びした無防備地帯を作らない。
   const DEFENSE_LINE_Y = 330; // 防衛ライン。ここを敵が越えるとダメージ
-  const PLAYER_Y = 380; // 自キャラ(=自分自身。HPの象徴)の立ち位置。もう攻撃はしない
+  const PLAYER_Y = 352; // 自キャラ(=自分自身。HPの象徴)の立ち位置。もう攻撃はしない
   // マージキャノン方式のユニット配置スロット(3レーン×前後2列=6マス)。
   // レーン中心Xに揃えることで、そのまま自動攻撃の当たり判定(レーン基準)を使い回せる。
   const ROW_SLOTS = [];
@@ -689,8 +689,13 @@
     return -1;
   }
 
+  // 列に出現するのは「攻撃タイプを持つ所持キャラ」全員から。サポート型は編成(party)でオーラ専任にする
+  // ことで、列のマスが常に攻撃ユニットで埋まるようにする（サポート型が枠を無駄にしないため）。
   function spawnPoolKeys() {
-    const pool = party.length ? party : Object.keys(roster);
+    const pool = Object.keys(roster).filter((k) => {
+      const def = CHARACTERS.find((c) => c.key === k);
+      return def && def.weaponType;
+    });
     return pool.length ? pool : ['ace'];
   }
 
@@ -1022,9 +1027,10 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     for (let i = 1; i < COLS; i++) { ctx.beginPath(); ctx.moveTo(i * COL_W, 0); ctx.lineTo(i * COL_W, CH); ctx.stroke(); }
 
-    // 防衛ライン（この下は自分の陣地。ここを越えられるとダメージ）
+    // 防衛ライン（ここを越えられるとダメージ）。自キャラはもう戦わないので、
+    // 帯は「ここが境界」とわかる程度の細さに抑え、下の空間を広く取らない。
     ctx.fillStyle = 'rgba(255,181,71,0.12)';
-    ctx.fillRect(0, DEFENSE_LINE_Y, CW, CH - DEFENSE_LINE_Y);
+    ctx.fillRect(0, DEFENSE_LINE_Y, CW, Math.min(36, CH - DEFENSE_LINE_Y));
     ctx.strokeStyle = 'rgba(255,181,71,0.9)';
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, DEFENSE_LINE_Y); ctx.lineTo(CW, DEFENSE_LINE_Y); ctx.stroke();
