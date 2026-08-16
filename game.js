@@ -32,6 +32,7 @@
     btnRetryDay: $('btn-retry-day'), btnGameoverTitle: $('btn-gameover-title'),
     adRewardModal: $('ad-reward-modal'), adRewardCountdown: $('ad-reward-countdown'),
     levelupModal: $('levelup-modal'), levelupChoices: $('levelup-choices'),
+    gachaChargeBanner: $('gacha-charge-banner'), gachaResultNewBadge: $('gacha-result-new-badge'),
     btnOpenRosterTitle: $('btn-open-roster-title'), btnOpenRosterPause: $('btn-open-roster-pause'),
     rosterCoins: $('roster-coins'), rosterPartyCount: $('roster-party-count'), rosterList: $('roster-list'),
     btnGachaPull: $('btn-gacha-pull'), btnGachaPullX10: $('btn-gacha-pull-x10'),
@@ -40,7 +41,8 @@
     gachaResultRarity: $('gacha-result-rarity'),
     gachaResultIcon: $('gacha-result-icon'), gachaResultName: $('gacha-result-name'),
     gachaResultNote: $('gacha-result-note'), btnGachaResultClose: $('btn-gacha-result-close'),
-    gachaResultX10Modal: $('gacha-result-x10-modal'), gachaX10Summary: $('gacha-x10-summary'),
+    gachaResultX10Modal: $('gacha-result-x10-modal'), gachaResultX10Box: $('gacha-result-x10-box'),
+    gachaX10Summary: $('gacha-x10-summary'),
     gachaX10Grid: $('gacha-x10-grid'), btnGachaX10Close: $('btn-gacha-x10-close'),
   };
 
@@ -135,6 +137,7 @@
   // ---------- 仲間(社員)システム: 20種、採用ガチャで収集し最大5人編成 ----------
   // apply(a, s): 編成中の効果を集計オブジェクト a に加算/乗算する。s はダブり数から算出したレベル倍率。
   const GACHA_COST = 40; // コインガチャ1回のコスト
+  const PARTY_MAX = 3; // 編成できる仲間の最大人数
   const ROLE_LABEL = { atk: '⚔️アタッカー', def: '🛡️ディフェンダー', sup: '💖サポーター', trick: '🃏トリックスター' };
   // 季節限定キャラ用の自作SVGアイコン（外部画像を使わず自前で描画）
   const ART_GAL =
@@ -344,6 +347,7 @@
       playerX: CW / 2, dragging: false, playerRecoil: 0, laserActive: false,
       runLevel: 1, runExp: 0, choosingUpgrade: false,
       weapons: { basic: { level: 1, timer: 300 } },
+      partyTickTimers: [], partyFx: [],
       runBuffs: { critBonus: 0, coinMul: 1, pickupRange: 0, shield: 0 },
       partyAgg: freshPartyAggregate(), exEmpUsed: false, exEmpUntil: 0,
     };
@@ -1016,6 +1020,7 @@
     if (S.playerRecoil > 0) S.playerRecoil -= dt;
     updateWeapons(dt);
     updatePartyTicks(dt);
+    updatePartyVisualTicks(dt);
 
     const slow = performance.now() < S.slowUntil ? S.slowFactor : 1;
     for (let i = S.entities.length - 1; i >= 0; i--) {
@@ -1083,29 +1088,67 @@
   // ---------- 描画 ----------
   function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
 
-  // 編成中の仲間を自陣（防衛ラインの下）に並べて表示する。
-  // それまでは効果が数値バフのみで画面に一切出てこず「編成しても現れない」との指摘があったため追加。
+  // 編成中の仲間を自陣（防衛ラインの下）に並べて表示する。空き枠は点線の「+」で見せる。
+  // 数値バフだけでは「仲間になった感じがしない」との指摘があったため、
+  // 各キャラの位置から定期的に小さな攻撃演出(上方向の光弾)も飛ばす。
   function renderPartyRow() {
-    if (party.length === 0) return;
-    const y = DEFENSE_LINE_Y + 34;
-    const spacing = 32;
-    const startX = CW / 2 - ((party.length - 1) * spacing) / 2;
-    ctx.font = '18px sans-serif';
+    const y = DEFENSE_LINE_Y + 36;
+    const spacing = 48;
+    const startX = CW / 2 - ((PARTY_MAX - 1) * spacing) / 2;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    party.forEach((key, i) => {
-      const def = CHARACTERS.find((c) => c.key === key);
-      if (!def) return;
+    for (let i = 0; i < PARTY_MAX; i++) {
       const x = startX + i * spacing;
-      const bob = Math.sin(performance.now() / 320 + i * 1.7) * 2;
-      ctx.save();
-      ctx.fillStyle = 'rgba(255,255,255,0.10)';
-      circle(x, y + bob, 14);
-      ctx.strokeStyle = 'rgba(255,181,71,0.5)';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(x, y + bob, 14, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillText(def.icon, x, y + bob);
-      ctx.restore();
-    });
+      const key = party[i];
+      if (key) {
+        const def = CHARACTERS.find((c) => c.key === key);
+        const bob = Math.sin(performance.now() / 320 + i * 1.7) * 2;
+        ctx.save();
+        ctx.fillStyle = 'rgba(255,181,71,0.2)';
+        circle(x, y + bob, 19);
+        ctx.strokeStyle = 'rgba(255,181,71,0.85)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x, y + bob, 19, 0, Math.PI * 2); ctx.stroke();
+        ctx.font = '22px sans-serif';
+        if (def) ctx.fillText(def.icon, x, y + bob);
+        ctx.restore();
+        const fx = S.partyFx.find((f) => f.slot === i);
+        if (fx) {
+          const t = 1 - fx.life / fx.maxLife;
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, 1 - t);
+          ctx.fillStyle = '#8fe3ff';
+          circle(x, (y + bob) - t * 90, 3);
+          ctx.restore();
+        }
+      } else {
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, 19, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('+', x, y);
+        ctx.restore();
+      }
+    }
+  }
+
+  function updatePartyVisualTicks(dt) {
+    while (S.partyTickTimers.length < party.length) S.partyTickTimers.push(800 + Math.random() * 1200);
+    S.partyTickTimers.length = party.length;
+    for (let i = 0; i < party.length; i++) {
+      S.partyTickTimers[i] -= dt;
+      if (S.partyTickTimers[i] <= 0) {
+        S.partyTickTimers[i] = 1300 + Math.random() * 1300;
+        S.partyFx.push({ slot: i, life: 300, maxLife: 300 });
+      }
+    }
+    for (let i = S.partyFx.length - 1; i >= 0; i--) {
+      S.partyFx[i].life -= dt;
+      if (S.partyFx[i].life <= 0) S.partyFx.splice(i, 1);
+    }
   }
 
   function render() {
@@ -1395,11 +1438,11 @@
     }
   }
 
-  function flashScreen(variant) {
+  function flashScreen(variant, multi) {
     const f = document.createElement('div');
-    f.className = `gacha-flash playing ${variant}`;
+    f.className = `gacha-flash ${multi ? 'multi' : 'playing'} ${variant}`;
     document.body.appendChild(f);
-    setTimeout(() => f.remove(), 650);
+    setTimeout(() => f.remove(), multi ? 1150 : 650);
   }
 
   function showGachaResult(result) {
@@ -1410,6 +1453,8 @@
     else EL.gachaResultIcon.textContent = result.picked.icon;
     EL.gachaResultName.textContent = displayCharName(result.picked, owned);
     EL.gachaResultNote.textContent = result.isNew ? '新しく採用しました！' : `重複採用(${result.dupes}人目) → Lv.${owned.level}に強化`;
+    EL.gachaResultNewBadge.classList.toggle('hidden', !result.isNew);
+    EL.gachaChargeBanner.textContent = rarity === 'SSR' ? '🎉SSR確定!!🎉' : rarity === 'SR' ? 'SR確定！' : '';
     EL.gachaResultBox.className = `revealing rar-${rarity}`;
     if (rarity === 'SSR' || rarity === 'SR') EL.gachaResultBox.classList.add(`charging-${rarity}`);
     EL.gachaResultModal.classList.remove('hidden');
@@ -1417,12 +1462,13 @@
       EL.gachaResultBox.classList.remove('revealing', 'charging-SSR', 'charging-SR');
       EL.gachaResultBox.classList.add('pop');
       if (rarity === 'SSR') {
-        flashScreen('flash-gold');
-        spawnGachaParticles(30, RARITY_PARTICLE_COLORS.SSR);
+        flashScreen('flash-gold', true);
+        spawnGachaParticles(60, RARITY_PARTICLE_COLORS.SSR);
+        setTimeout(() => spawnGachaParticles(30, RARITY_PARTICLE_COLORS.SSR), 250);
         EL.gachaResultBox.classList.add('shake');
       } else if (rarity === 'SR') {
         flashScreen('flash-purple');
-        spawnGachaParticles(16, RARITY_PARTICLE_COLORS.SR);
+        spawnGachaParticles(20, RARITY_PARTICLE_COLORS.SR);
       }
     }, RARITY_REVEAL_DELAY[rarity] || 400);
   }
@@ -1452,6 +1498,7 @@
       card.className = `gacha-x10-card rar-${res.picked.rarity}`;
       card.style.animationDelay = `${i * 60}ms`;
       card.innerHTML =
+        (res.isNew ? '<div class="gacha-x10-card-new">NEW</div>' : '') +
         `<div class="gacha-x10-card-icon">${res.picked.art || res.picked.icon}</div>` +
         `<div class="gacha-x10-card-rarity">${res.picked.rarity}</div>` +
         `<div class="gacha-x10-card-name">${displayCharName(res.picked, owned)}</div>`;
@@ -1459,10 +1506,13 @@
     });
     EL.gachaX10Summary.textContent = `SSR×${counts.SSR}　SR×${counts.SR}　R×${counts.R}　N×${counts.N}`;
     EL.gachaResultX10Modal.classList.remove('hidden');
+    EL.gachaResultX10Box.classList.remove('jackpot');
     if (counts.SSR > 0) {
       setTimeout(() => {
-        flashScreen('flash-gold');
-        spawnGachaParticles(24 + counts.SSR * 10, RARITY_PARTICLE_COLORS.SSR);
+        flashScreen('flash-gold', true);
+        spawnGachaParticles(50 + counts.SSR * 15, RARITY_PARTICLE_COLORS.SSR);
+        setTimeout(() => spawnGachaParticles(30, RARITY_PARTICLE_COLORS.SSR), 250);
+        EL.gachaResultX10Box.classList.add('jackpot');
       }, 300);
     } else if (counts.SR > 0) {
       setTimeout(() => {
@@ -1477,7 +1527,7 @@
   function toggleParty(key) {
     const idx = party.indexOf(key);
     if (idx >= 0) party.splice(idx, 1);
-    else { if (party.length >= 5) return; party.push(key); }
+    else { if (party.length >= PARTY_MAX) return; party.push(key); }
     saveProgress();
     renderRoster();
   }

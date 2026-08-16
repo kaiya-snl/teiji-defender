@@ -624,12 +624,13 @@ button:disabled {
   100% { box-shadow: 0 0 64px rgba(199,146,234,0.95); transform: scale(1.05); }
 }
 #gacha-result-box.charging-SSR {
-  animation: gachaChargeSSR 1.8s ease-in forwards;
+  animation: gachaChargeSSR 2.6s ease-in forwards;
 }
 @keyframes gachaChargeSSR {
-  0% { box-shadow: 0 0 14px rgba(255,213,79,0.3); transform: scale(1) rotate(0deg); }
-  60% { box-shadow: 0 0 60px rgba(255,213,79,0.8); }
-  100% { box-shadow: 0 0 100px rgba(255,213,79,1); transform: scale(1.08) rotate(0deg); }
+  0% { box-shadow: 0 0 14px rgba(255,213,79,0.3); transform: scale(1); }
+  40% { box-shadow: 0 0 50px rgba(255,213,79,0.7); transform: scale(1.03); }
+  75% { box-shadow: 0 0 90px rgba(255,213,79,0.95); transform: scale(1.08); }
+  100% { box-shadow: 0 0 140px rgba(255,213,79,1); transform: scale(1.14); }
 }
 
 /* 開示の瞬間のポップ演出 */
@@ -642,15 +643,24 @@ button:disabled {
   100% { transform: scale(1); }
 }
 #gacha-result-box.shake {
-  animation: gachaShake 0.45s ease-in-out;
+  animation: gachaShake 0.7s ease-in-out;
 }
 @keyframes gachaShake {
-  0%, 100% { transform: translate(0,0); }
-  15% { transform: translate(-7px, 4px); }
-  30% { transform: translate(7px, -4px); }
-  45% { transform: translate(-6px, 5px); }
-  60% { transform: translate(6px, -3px); }
-  75% { transform: translate(-3px, 2px); }
+  0%, 100% { transform: translate(0,0) scale(1); }
+  10% { transform: translate(-10px, 6px) scale(1.03); }
+  20% { transform: translate(10px, -6px) scale(1.03); }
+  30% { transform: translate(-9px, 7px) scale(1.03); }
+  40% { transform: translate(9px, -5px) scale(1.02); }
+  50% { transform: translate(-7px, 4px) scale(1.02); }
+  60% { transform: translate(7px, -3px); }
+  70% { transform: translate(-4px, 3px); }
+  80% { transform: translate(4px, -2px); }
+  90% { transform: translate(-2px, 1px); }
+}
+
+/* 10連でSSRが出た時、グリッド全体を揺らして「大当たり感」を出す */
+#gacha-result-x10-box.jackpot {
+  animation: gachaShake 0.7s ease-in-out;
 }
 
 /* 画面全体フラッシュ・紙吹雪パーティクル(SSR/SR専用) */
@@ -688,6 +698,63 @@ button:disabled {
 @keyframes gachaParticleFly {
   0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
   100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2) rotate(200deg); opacity: 0; }
+}
+
+/* 大当たり演出バナー(SSR/SR溜め中に表示) */
+#gacha-charge-banner {
+  display: none;
+  font-size: 22px;
+  font-weight: 900;
+  text-align: center;
+  margin-bottom: 6px;
+  letter-spacing: 1px;
+}
+#gacha-result-box.charging-SSR #gacha-charge-banner,
+#gacha-result-box.charging-SR #gacha-charge-banner {
+  display: block;
+  animation: gachaBannerPulse 0.4s ease-in-out infinite alternate;
+}
+#gacha-result-box.charging-SSR #gacha-charge-banner {
+  color: #ffd54f;
+  text-shadow: 0 0 12px rgba(255,213,79,0.9), 0 0 24px rgba(255,213,79,0.6);
+}
+#gacha-result-box.charging-SR #gacha-charge-banner {
+  color: #c792ea;
+  text-shadow: 0 0 10px rgba(199,146,234,0.9);
+}
+@keyframes gachaBannerPulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.15); }
+}
+
+/* NEW バッジ（初採用の1連演出） */
+#gacha-result-new-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: #ff5c5c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 6px;
+  transform: rotate(12deg);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+#gacha-result-new-badge.hidden { display: none; }
+
+/* 複数回フラッシュ(SSR用、パチンコ大当たり風に連続発光) */
+.gacha-flash.multi {
+  animation: gachaFlashMulti 1.1s ease-out;
+}
+@keyframes gachaFlashMulti {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  20% { opacity: 0.2; }
+  32% { opacity: 1; }
+  44% { opacity: 0.15; }
+  56% { opacity: 0.9; }
+  100% { opacity: 0; }
 }
 
 #gacha-result-rarity {
@@ -750,6 +817,7 @@ button:disabled {
 }
 
 .gacha-x10-card {
+  position: relative;
   background: var(--color-panel-light);
   border-radius: 8px;
   padding: 8px 2px;
@@ -757,6 +825,21 @@ button:disabled {
   opacity: 0;
   transform: scale(0.5);
   animation: gachaCardIn 0.35s ease-out forwards;
+}
+
+.gacha-x10-card-new {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ff5c5c;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 4px;
+  border-radius: 4px;
+  transform: rotate(12deg);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  z-index: 2;
 }
 
 @keyframes gachaCardIn {

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>定時退社ディフェンダー</title>
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -90,7 +90,7 @@
     <div id="screen-roster" class="screen hidden">
       <h2>仲間編成・採用</h2>
       <p class="shop-coins">所持コイン: <span id="roster-coins">0</span> 💰</p>
-      <p class="roster-party-count">出撃メンバー: <span id="roster-party-count">0</span>/5（タップで編成/解除）</p>
+      <p class="roster-party-count">出撃メンバー: <span id="roster-party-count">0</span>/3（タップで編成/解除）</p>
       <p class="roster-test-note">🔧 テスト版のため、ガチャは今だけ無料・無制限で回せます</p>
       <div id="roster-gacha-bar">
         <button id="btn-gacha-pull" class="btn-primary">採用面接する<br><span class="gacha-btn-sub">1回（無料・テスト版）</span></button>
@@ -154,10 +154,12 @@
   <div id="gacha-result-modal" class="hidden">
     <div id="gacha-result-rays"></div>
     <div id="gacha-result-box">
+      <div id="gacha-charge-banner"></div>
       <p id="gacha-result-rarity">SSR</p>
       <p id="gacha-result-icon">💼</p>
       <p id="gacha-result-name">新人エース</p>
       <p id="gacha-result-note"></p>
+      <div id="gacha-result-new-badge" class="hidden">NEW</div>
       <button id="btn-gacha-result-close" class="btn-primary">閉じる</button>
     </div>
   </div>
@@ -187,6 +189,6 @@
   <!-- ===== 広告枠（下部バナー） ===== -->
   <div id="ad-bottom" class="ad-slot">広告枠（下部バナー / ここに AdSense 等のタグを設置）</div>
 
-  <script src="game.js?v=7"></script>
+  <script src="game.js?v=8"></script>
 </body>
 </html>
