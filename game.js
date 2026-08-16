@@ -51,9 +51,9 @@
 
   const ctx = EL.canvas.getContext('2d');
   const CW = 360, CH = 480, COLS = 3, COL_W = CW / COLS;
-  const DEFENSE_LINE_Y = 420; // 防衛ライン。ここを敵が越えるとダメージ
-  const PLAYER_Y = DEFENSE_LINE_Y - 24; // 自キャラの立ち位置(縦・固定)
-  const TOWER_ROW_Y = 250; // 仲間ユニット列の基準Y(前列)
+  // 防衛ラインはユニット列(後列y=290)のすぐ後ろに設定。間延びした無防備地帯を作らない。
+  const DEFENSE_LINE_Y = 330; // 防衛ライン。ここを敵が越えるとダメージ
+  const PLAYER_Y = 380; // 自キャラ(=自分自身。HPの象徴)の立ち位置。もう攻撃はしない
   // マージキャノン方式のユニット配置スロット(3レーン×前後2列=6マス)。
   // レーン中心Xに揃えることで、そのまま自動攻撃の当たり判定(レーン基準)を使い回せる。
   const ROW_SLOTS = [];
@@ -91,48 +91,11 @@
   // 恒常強化（コイン購入・日をまたいで引き継ぐ）
   const UPGRADES = [
     { key: 'pc',        name: '高スペックPC',               icon: '💻', desc: '全武器の攻撃力アップ',               baseCost: 20, costMul: 1.6, effectPerLv: 3,  maxLv: 12 },
-    { key: 'monitor',   name: 'デュアルモニター',           icon: '🖥️', desc: 'ブラインドタッチ弾が同時に狙えるレーン+', baseCost: 35, costMul: 1.8, maxLv: 3 },
+    { key: 'monitor',   name: 'デュアルモニター',           icon: '🖥️', desc: '新戦力の出現間隔が短くなる',         baseCost: 35, costMul: 1.8, maxLv: 3 },
     { key: 'tool',      name: '有償ツール',                 icon: '🛠️', desc: '全武器の会心率アップ',               baseCost: 25, costMul: 1.7, effectPerLv: 8,  maxLv: 10 },
     { key: 'headphone', name: 'ノイズキャンセリングイヤホン', icon: '🎧', desc: '「上司の長話」の被ダメを軽減',       baseCost: 30, costMul: 1.7, effectPerLv: 10, maxLv: 8 },
   ];
 
-  // ---------- 武器システム(7種) ----------
-  // 各武器は Lv1〜10。所持していない武器はレベルアップ選択で「New!」として出現する。
-  const WEAPONS = {
-    basic: {
-      icon: '⌨️', baseName: 'ブラインドタッチ弾', maxName: '神速のタイピング', maxLv: 10,
-      desc: '前方に単体攻撃弾を連射。Lv上昇で連射速度・威力・同時レーン数がアップ。高Lvで弾が繋がりレーザー状に。',
-    },
-    pierce: {
-      icon: '📋', baseName: 'コピペ・レーザー', maxName: '一括置換ビーム', maxLv: 10,
-      desc: '直線上の敵を貫通する太いビーム。Lv上昇で貫通幅と威力がアップ。',
-    },
-    bomb: {
-      icon: '📧', baseName: 'マクロ爆撃(VBAボム)', maxName: '全社メール一斉送信', maxLv: 10,
-      desc: '命中/到達地点で爆発し周囲にダメージ。密集した敵に強い。Lv上昇で範囲と威力アップ。',
-    },
-    drone: {
-      icon: '🤖', baseName: 'AIアシスタント', maxName: '自律型AI完全導入', maxLv: 10,
-      desc: '自動で敵を追尾する分身。プレイヤーの攻撃とは独立して敵を処理する。Lv上昇で体数アップ。',
-    },
-    trap: {
-      icon: '📤', baseName: 'アウトソーシング(外注化トラップ)', maxName: '完全自動化ライン', maxLv: 10,
-      desc: 'レーン上に設置型トラップ。触れた敵に持続ダメージ。Lv上昇で設置数と持続時間アップ。',
-    },
-    freeze: {
-      icon: '📅', baseName: '「リスケ」フリーズ', maxName: '無限検討モード', maxLv: 10,
-      desc: '最前列の敵の動きを遅くする。高Lvで完全に足止め(ストップ)することも。マクロ爆撃と好相性。',
-    },
-    knock: {
-      icon: '🪑', baseName: '「ちゃぶ台返し」ウェーブ', maxName: '役員の鶴の一声', maxLv: 10,
-      desc: '定期的に衝撃波を発生させ、近づく敵を大きく押し返す。Lv10で画面半分近くまで押し返す鉄壁に。',
-    },
-  };
-
-  function weaponDisplayName(key, lv) {
-    const w = WEAPONS[key];
-    return lv >= w.maxLv ? w.maxName : w.baseName;
-  }
 
   // 汎用強化カード（ステージ限定の一時強化。武器と並んでレベルアップ選択に出現）
   const GENERIC_CARDS = [
@@ -255,8 +218,6 @@
       apply: (a, s) => { a.bombRadiusMul += 0.10 * s; a.bombDmgMul += 0.14 * s; a.allDmgMul += 0.05 * s; a.hpDrainPerSec += 0.15 * s; } },
   ];
 
-  const MONITOR_EXTRA = [0, 1, 2, 2]; // デュアルモニターLv→ブラインドタッチ弾への常時追加レーン数
-  const FIRE_OFFSET_SETS = [[0], [0, 1], [0, -1, 1]]; // COLS=3を前提とした発射レーンオフセット(単位:COL_W)
 
   // 金曜ボス「帰り際の上司」: フェーズは hpAbove の降順で判定する。HPは週数に応じて強くなる。
   const BOSS = {
@@ -353,10 +314,10 @@
       bossActive: false, boss: null, bossPhaseIndex: -1,
       lectureActive: false, lectureTimer: 0,
       shopReturn: 'title', lastTime: 0,
-      playerX: CW / 2, playerRecoil: 0, laserActive: false,
+      playerX: CW / 2, playerRecoil: 0,
       runLevel: 1, runExp: 0, choosingUpgrade: false,
-      weapons: { basic: { level: 1, timer: 300 } },
       row: new Array(ROW_SLOTS.length).fill(null), unitSpawnTimer: 1200, dragSlot: -1, dragPos: null,
+      rowDmgMul: 1, rowFireRateMul: 1, rowSpawnRateMul: 1,
       runBuffs: { critBonus: 0, coinMul: 1, pickupRange: 0, shield: 0 },
       partyAgg: freshPartyAggregate(), exEmpUsed: false, exEmpUntil: 0,
     };
@@ -488,8 +449,6 @@
     setTimeout(() => { EL.canvas.style.filter = ''; }, 120);
   }
 
-  function clampX(x) { return Math.max(16, Math.min(CW - 16, x)); }
-
   // ---------- 敵・アイテムのスポーン ----------
   function pickWeighted(pairs) {
     const total = pairs.reduce((s, p) => s + p[1], 0);
@@ -576,23 +535,16 @@
     }
   }
 
+  // レベルアップ選択は「列のユニット全体」を強化する方向に統一（自キャラ個人の武器は廃止）。
+  const ROW_LEVEL_CARDS = [
+    { icon: '💥', name: '全ユニット攻撃力アップ', desc: '列にいる全ユニットの攻撃力が上がる', apply: () => { S.rowDmgMul += 0.15; } },
+    { icon: '⚡', name: '全ユニット攻撃速度アップ', desc: '列にいる全ユニットの攻撃間隔が短くなる', apply: () => { S.rowFireRateMul *= 0.9; } },
+    { icon: '🆕', name: '新戦力アップ', desc: '新しいユニットが出現する間隔が短くなる', apply: () => { S.rowSpawnRateMul *= 0.85; } },
+  ];
+
   function buildLevelUpPool() {
     const pool = [];
-    for (const key in WEAPONS) {
-      const def = WEAPONS[key];
-      const owned = S.weapons[key];
-      if (owned && owned.level >= def.maxLv) continue;
-      const nextLv = owned ? owned.level + 1 : 1;
-      pool.push({
-        icon: def.icon,
-        name: owned ? `${weaponDisplayName(key, nextLv)} Lv.${nextLv}` : `${def.baseName}【New!】`,
-        desc: def.desc,
-        apply: () => {
-          if (!S.weapons[key]) S.weapons[key] = { level: 1, timer: 0 };
-          else S.weapons[key].level += 1;
-        },
-      });
-    }
+    for (const c of ROW_LEVEL_CARDS) pool.push(c);
     for (const c of GENERIC_CARDS) pool.push(c);
     return pool;
   }
@@ -726,179 +678,6 @@
     if (target) hitEnemy(target, tapDmg);
   }
 
-  // ---------- 武器システム: 発射・更新処理 ----------
-  function basicFireOffsets(lv) {
-    const fromWeapon = lv >= 7 ? 2 : lv >= 4 ? 1 : 0;
-    const fromMonitor = MONITOR_EXTRA[Math.min(upgrades.monitor, 3)];
-    const fromParty = S.partyAgg.extraLaneBonus;
-    const extra = Math.min(COLS - 1, fromWeapon + fromMonitor + fromParty);
-    return FIRE_OFFSET_SETS[extra].map((n) => n * COL_W);
-  }
-
-  function updateWeaponBasic(dt) {
-    const w = S.weapons.basic;
-    let fireRateMul = S.partyAgg.basicFireRateMul;
-    if (S.partyAgg.dashScale > 0 && !S.isExtraStage && S.elapsed / S.stageDuration > 0.7) {
-      fireRateMul *= Math.max(0.3, 1 - 0.5 * S.partyAgg.dashScale);
-    }
-    const interval = Math.max(50, (340 - w.level * 27) * fireRateMul);
-    S.laserActive = interval <= 110;
-    w.timer -= dt;
-    if (w.timer <= 0) {
-      w.timer = interval;
-      const dmgBase = 7 + w.level * 3;
-      for (const off of basicFireOffsets(w.level)) {
-        S.bullets.push({ kind: 'basic', x: clampX(S.playerX + off), y: PLAYER_Y - 18, dmgBase, hitSet: new Set() });
-      }
-      S.playerRecoil = 90;
-    }
-  }
-
-  function updateWeaponPierce(dt) {
-    const w = S.weapons.pierce;
-    if (!w) return;
-    w.timer -= dt;
-    const interval = Math.max(700, 1500 - w.level * 60);
-    if (w.timer <= 0) {
-      w.timer = interval;
-      const dmgBase = 10 + w.level * 4;
-      const laneWidth = 1 + Math.floor(w.level / 4);
-      const halfWidth = laneWidth * COL_W * 0.5 + 8;
-      S.bullets.push({ kind: 'pierce', x: S.playerX, y: PLAYER_Y - 18, dmgBase, halfWidth, hitSet: new Set() });
-    }
-  }
-
-  function updateWeaponBomb(dt) {
-    const w = S.weapons.bomb;
-    if (!w) return;
-    w.timer -= dt;
-    const interval = Math.max(900, 2200 - w.level * 120);
-    if (w.timer <= 0) {
-      w.timer = interval;
-      const dmgBase = (12 + w.level * 5) * (1 + S.partyAgg.bombDmgMul);
-      const radius = (45 + w.level * 9) * (1 + S.partyAgg.bombRadiusMul);
-      S.bombs.push({ x: S.playerX, y: PLAYER_Y - 18, dmgBase, radius });
-    }
-    for (let i = S.bombs.length - 1; i >= 0; i--) {
-      const b = S.bombs[i];
-      b.y -= 250 * dt / 1000;
-      let explode = b.y <= 55;
-      if (!explode) {
-        for (const e of S.entities) { if (Math.hypot(b.x - e.x, b.y - e.y) < 22) { explode = true; break; } }
-      }
-      if (explode) {
-        spawnExplosion(b.x, b.y, b.radius, '255,140,60');
-        for (const e of S.entities.slice()) {
-          if (Math.hypot(b.x - e.x, b.y - e.y) < b.radius) hitEnemy(e, b.dmgBase);
-        }
-        if (S.bossActive && S.boss && S.boss.hp > 0 && b.y <= 150) hitBoss(b.dmgBase);
-        S.bombs.splice(i, 1);
-      } else if (b.y < -20) {
-        S.bombs.splice(i, 1);
-      }
-    }
-  }
-
-  function updateWeaponDrone(dt) {
-    const w = S.weapons.drone;
-    if (!w) { S.drones.length = 0; return; }
-    const wantCount = Math.min(5, Math.ceil(w.level / 2));
-    while (S.drones.length < wantCount) {
-      S.drones.push({ x: S.playerX + (Math.random() * 40 - 20), y: PLAYER_Y - 40, target: null, cooldown: 0, seed: Math.random() * 10 });
-    }
-    if (S.drones.length > wantCount) S.drones.length = wantCount;
-    const dmgBase = 6 + w.level * 2;
-    for (const d of S.drones) {
-      if (!d.target || d.target.hp <= 0 || S.entities.indexOf(d.target) === -1) {
-        let best = null, bd = 99999;
-        for (const e of S.entities) { const dd = Math.hypot(e.x - d.x, e.y - d.y); if (dd < bd) { bd = dd; best = e; } }
-        d.target = best;
-      }
-      d.cooldown -= dt;
-      if (d.target) {
-        const ang = Math.atan2(d.target.y - d.y, d.target.x - d.x);
-        d.x += Math.cos(ang) * 150 * dt / 1000;
-        d.y += Math.sin(ang) * 150 * dt / 1000;
-        if (Math.hypot(d.target.x - d.x, d.target.y - d.y) < 18 && d.cooldown <= 0) {
-          d.cooldown = 400;
-          hitEnemy(d.target, dmgBase);
-        }
-      } else {
-        d.x += Math.sin(performance.now() / 500 + d.seed) * 0.6;
-        d.y += (PLAYER_Y - 50 - d.y) * 0.05;
-      }
-    }
-  }
-
-  function updateWeaponTrap(dt) {
-    const w = S.weapons.trap;
-    if (w) {
-      w.timer -= dt;
-      const maxCount = Math.min(5, 1 + Math.floor(w.level / 3) + S.partyAgg.trapMaxCountBonus);
-      if (w.timer <= 0 && S.traps.length < maxCount) {
-        w.timer = 1200;
-        const lane = Math.floor(Math.random() * COLS);
-        const dur = (4000 + w.level * 500) * (1 + S.partyAgg.trapDurationMul);
-        S.traps.push({ x: lane * COL_W + COL_W / 2, y: 95, life: dur, maxLife: dur, tickTimer: 0, dmg: 4 + w.level * 1.5 });
-      }
-    }
-    for (let i = S.traps.length - 1; i >= 0; i--) {
-      const t = S.traps[i];
-      t.life -= dt; t.tickTimer -= dt;
-      if (t.life <= 0) { S.traps.splice(i, 1); continue; }
-      if (t.tickTimer <= 0) {
-        t.tickTimer = 400;
-        for (const e of S.entities) {
-          if (Math.abs(e.x - t.x) < 26 && Math.abs(e.y - t.y) < 26) hitEnemy(e, t.dmg);
-        }
-      }
-    }
-  }
-
-  function updateWeaponFreeze(dt) {
-    const w = S.weapons.freeze;
-    if (!w) return;
-    w.timer -= dt;
-    const interval = Math.max(600, (2600 - w.level * 100) * S.partyAgg.freezeIntervalMul);
-    if (w.timer <= 0) {
-      w.timer = interval;
-      const targetCount = Math.min(3, 1 + Math.floor(w.level / 4));
-      const freezeChance = Math.min(1, (w.level >= 10 ? 0.8 : w.level >= 8 ? 0.4 : 0) + S.partyAgg.freezeChanceBonus);
-      const front = S.entities.slice().sort((a, b) => b.y - a.y).slice(0, targetCount);
-      for (const e of front) {
-        const full = Math.random() < freezeChance;
-        e.slowUntil = performance.now() + (1200 + w.level * 200);
-        e.slowMul = full ? 0 : 0.35;
-        spawnFx(e.x, e.y - 20, full ? 'ストップ!' : 'リスケ…', '#8fe3ff', 700);
-      }
-    }
-  }
-
-  function updateWeaponKnock(dt) {
-    const w = S.weapons.knock;
-    if (!w) return;
-    w.timer -= dt;
-    const interval = Math.max(500, (3200 - w.level * 220) * S.partyAgg.knockIntervalMul);
-    if (w.timer <= 0) {
-      w.timer = interval;
-      const dist = (60 + w.level * 18) * (1 + S.partyAgg.knockDistMul);
-      for (const e of S.entities) {
-        if (e.y > 130) e.y = Math.max(20, e.y - dist);
-      }
-      spawnExplosion(S.playerX, PLAYER_Y, 40 + dist, '255,181,71');
-    }
-  }
-
-  function updateWeapons(dt) {
-    updateWeaponBasic(dt);
-    updateWeaponPierce(dt);
-    updateWeaponBomb(dt);
-    updateWeaponDrone(dt);
-    updateWeaponTrap(dt);
-    updateWeaponFreeze(dt);
-    updateWeaponKnock(dt);
-  }
-
   // ---------- マージキャノン方式の仲間ユニット列 ----------
   // 所持キャラがランダムに列(6マス)へ出現し、同じキャラ&同じLvをドラッグで合体させると
   // 1段階強いユニットになる（Pumpkin Defense: Merge Cannon を参考）。
@@ -921,7 +700,8 @@
     const emptyIdx = [];
     S.row.forEach((u, i) => { if (!u) emptyIdx.push(i); });
     if (emptyIdx.length === 0) { S.unitSpawnTimer = 600; return; }
-    S.unitSpawnTimer = 4000 + Math.random() * 1400;
+    const monitorMul = 1 - Math.min(0.5, upgrades.monitor * 0.12);
+    S.unitSpawnTimer = (4000 + Math.random() * 1400) * S.rowSpawnRateMul * monitorMul;
     const pool = spawnPoolKeys();
     const key = pool[Math.floor(Math.random() * pool.length)];
     const idx = emptyIdx[Math.floor(Math.random() * emptyIdx.length)];
@@ -938,22 +718,26 @@
       if (u.timer > 0) return;
       const lv = u.level;
       const pos = ROW_SLOTS[i];
+      let frMul = S.rowFireRateMul * S.partyAgg.basicFireRateMul;
+      if (S.partyAgg.dashScale > 0 && !S.isExtraStage && S.elapsed / S.stageDuration > 0.7) {
+        frMul *= Math.max(0.3, 1 - 0.5 * S.partyAgg.dashScale);
+      }
       if (def.weaponType === 'basic') {
-        u.timer = Math.max(260, 850 - lv * 55);
-        S.bullets.push({ kind: 'basic', x: pos.x, y: pos.y - 16, dmgBase: 8 + lv * 5, hitSet: new Set() });
+        u.timer = Math.max(260, (850 - lv * 55) * frMul);
+        S.bullets.push({ kind: 'basic', x: pos.x, y: pos.y - 16, dmgBase: (8 + lv * 5) * S.rowDmgMul, hitSet: new Set() });
       } else if (def.weaponType === 'pierce') {
-        u.timer = Math.max(900, 2000 - lv * 85);
-        S.bullets.push({ kind: 'pierce', x: pos.x, y: pos.y - 16, dmgBase: 12 + lv * 6, halfWidth: COL_W * 0.4, hitSet: new Set() });
+        u.timer = Math.max(900, (2000 - lv * 85) * frMul);
+        S.bullets.push({ kind: 'pierce', x: pos.x, y: pos.y - 16, dmgBase: (12 + lv * 6) * S.rowDmgMul, halfWidth: COL_W * 0.4, hitSet: new Set() });
       } else if (def.weaponType === 'bomb') {
-        u.timer = Math.max(1100, 2300 - lv * 110);
-        S.bombs.push({ x: pos.x, y: pos.y - 16, dmgBase: 14 + lv * 7, radius: 46 + lv * 9 });
+        u.timer = Math.max(1100, (2300 - lv * 110) * frMul);
+        S.bombs.push({ x: pos.x, y: pos.y - 16, dmgBase: (14 + lv * 7) * S.rowDmgMul, radius: 46 + lv * 9 });
       } else if (def.weaponType === 'knock') {
-        u.timer = Math.max(1200, 3000 - lv * 190);
+        u.timer = Math.max(1200, (3000 - lv * 190) * frMul);
         const dist = 48 + lv * 15;
         for (const e of S.entities) { if (Math.abs(e.x - pos.x) < COL_W * 0.55 && e.y > pos.y) e.y = Math.max(20, e.y - dist); }
         spawnExplosion(pos.x, pos.y, 40 + dist, '255,181,71');
       } else if (def.weaponType === 'freeze') {
-        u.timer = Math.max(1100, 2400 - lv * 95);
+        u.timer = Math.max(1100, (2400 - lv * 95) * frMul);
         const target = S.entities.filter((e) => Math.abs(e.x - pos.x) < COL_W * 0.55).sort((a, b) => b.y - a.y)[0];
         if (target) {
           const freezeChance = lv >= 8 ? 0.4 : 0;
@@ -1113,8 +897,6 @@
     if (S.bossActive) updateBoss(dt); else maybeSpawnEnemy(dt);
     maybeSpawnItem(dt);
 
-    if (S.playerRecoil > 0) S.playerRecoil -= dt;
-    updateWeapons(dt);
     maybeSpawnUnit(dt);
     updateRowUnits(dt);
     updatePartyTicks(dt);
@@ -1137,10 +919,12 @@
       }
     }
 
+    // アイテムは自キャラが動かなくなったため、レーン位置に関わらず自陣付近まで落ちたら自動回収する。
+    // pickupRangeが高いほど早め(手前)に回収できる。
     for (let i = S.items.length - 1; i >= 0; i--) {
       const it = S.items[i];
       it.y += it.speed * dt / 1000;
-      if (Math.abs(it.y - PLAYER_Y) < 24 + S.runBuffs.pickupRange && Math.abs(it.x - S.playerX) < 42 + S.runBuffs.pickupRange) {
+      if (it.y > DEFENSE_LINE_Y - 30 - S.runBuffs.pickupRange) {
         collectItem(it);
         S.items.splice(i, 1);
         continue;
@@ -1278,18 +1062,6 @@
       ctx.restore();
       ctx.fillStyle = '#000a'; ctx.fillRect(e.x - e.w / 2, e.y - 24, e.w, 5);
       ctx.fillStyle = '#e05252'; ctx.fillRect(e.x - e.w / 2, e.y - 24, e.w * Math.max(0, e.hp / e.maxHp), 5);
-    }
-
-    // ブラインドタッチ弾が高速連射になると帯状のレーザーとして重ねて見せる
-    if (S.laserActive) {
-      ctx.save();
-      ctx.globalAlpha = 0.3;
-      ctx.fillStyle = '#8fe3ff';
-      for (const off of basicFireOffsets(S.weapons.basic.level)) {
-        const x = clampX(S.playerX + off);
-        ctx.fillRect(x - 6, 0, 12, PLAYER_Y - 10);
-      }
-      ctx.restore();
     }
 
     // 弾
