@@ -90,9 +90,9 @@
 
   // 恒常強化（コイン購入・日をまたいで引き継ぐ）
   const UPGRADES = [
-    { key: 'pc',        name: '高スペックPC',               icon: '💻', desc: '全武器の攻撃力アップ',               baseCost: 20, costMul: 1.6, effectPerLv: 3,  maxLv: 12 },
+    { key: 'pc',        name: '高スペックPC',               icon: '💻', desc: '列にいる全ユニットの攻撃力アップ',   baseCost: 20, costMul: 1.6, effectPerLv: 3,  maxLv: 12 },
     { key: 'monitor',   name: 'デュアルモニター',           icon: '🖥️', desc: '新戦力の出現間隔が短くなる',         baseCost: 35, costMul: 1.8, maxLv: 3 },
-    { key: 'tool',      name: '有償ツール',                 icon: '🛠️', desc: '全武器の会心率アップ',               baseCost: 25, costMul: 1.7, effectPerLv: 8,  maxLv: 10 },
+    { key: 'tool',      name: '有償ツール',                 icon: '🛠️', desc: '列にいる全ユニットの会心率アップ',   baseCost: 25, costMul: 1.7, effectPerLv: 8,  maxLv: 10 },
     { key: 'headphone', name: 'ノイズキャンセリングイヤホン', icon: '🎧', desc: '「上司の長話」の被ダメを軽減',       baseCost: 30, costMul: 1.7, effectPerLv: 10, maxLv: 8 },
   ];
 
@@ -150,25 +150,25 @@
 
   const CHARACTERS = [
     { key: 'ace', name: '新人エース', role: 'atk', rarity: 'SR', icon: '🌱', weaponType: 'basic',
-      desc: '配置レーンでブラインドタッチ型の攻撃。稀に攻撃が敵を回復させてしまう',
+      desc: '列に出現するとブラインドタッチ型の攻撃。稀に攻撃が敵を回復させてしまう',
       apply: (a, s) => { a.basicFireRateMul *= (1 - 0.05 * s); a.whiffHealChance += 0.015 * s; } },
     { key: 'excel', name: 'エクセル職人', role: 'atk', rarity: 'R', icon: '📊', weaponType: 'bomb',
-      desc: '配置レーンでマクロ爆撃(範囲攻撃)。全体の爆撃威力もアップ',
+      desc: '列に出現するとマクロ爆撃(範囲攻撃)。全体の爆撃威力もアップ',
       apply: (a, s) => { a.bombRadiusMul += 0.08 * s; a.bombDmgMul += 0.10 * s; } },
     { key: 'typing', name: 'タイピングの鬼', role: 'def', rarity: 'SSR', icon: '⌨️', weaponType: 'basic',
-      desc: '配置レーンで超高火力の単体攻撃。全武器の攻撃力も底上げ',
+      desc: '列に出現すると超高火力の単体攻撃。全ユニットの攻撃力も底上げ',
       apply: (a, s) => { a.allDmgMul += 0.10 * s; } },
     { key: 'gorilla', name: '営業のゴリラ', role: 'atk', rarity: 'R', icon: '🦍', weaponType: 'knock',
-      desc: '配置レーンで敵を吹き飛ばすノックバック攻撃',
+      desc: '列に出現すると敵を吹き飛ばすノックバック攻撃',
       apply: (a, s) => { a.knockDistMul += 0.10 * s; a.knockIntervalMul *= (1 - 0.06 * s); } },
     { key: 'kikoku', name: '帰国子女エンジニア', role: 'atk', rarity: 'SR', icon: '🌐', weaponType: 'pierce',
-      desc: '配置レーンを貫通するビーム攻撃。「謎のエラー」に特効',
+      desc: '出現した列を貫通するビーム攻撃。「謎のエラー」に特効',
       apply: (a, s) => { a.errorDmgMul += 0.25 * s; } },
     { key: 'legend', name: '伝説の派遣社員', role: 'sup', rarity: 'SSR', icon: '🕶️', weaponType: 'basic',
-      desc: '配置レーンで全方位に強い攻撃。全武器の攻撃力アップだが毎秒コインを消費',
+      desc: '列に出現すると全方位に強い攻撃。全ユニットの攻撃力アップだが毎秒コインを消費',
       apply: (a, s) => { a.allDmgMul += 0.12 * s; a.coinDrainPerSec += 0.4 * s; } },
     { key: 'otsubone', name: 'ベテランお局様', role: 'def', rarity: 'SR', icon: '👓', weaponType: 'freeze',
-      desc: '配置レーンの敵を睨みで足止め。高Lvで完全ストップも',
+      desc: '近くの敵を睨みで足止め。高Lvで完全ストップも',
       apply: (a, s) => { a.freezeIntervalMul *= (1 - 0.06 * s); a.freezeChanceBonus += 0.03 * s; } },
     { key: 'sekinin', name: '責任逃れの上司', role: 'def', rarity: 'R', icon: '🙈',
       desc: '被弾を確率で丸ごとブロック',
@@ -180,7 +180,7 @@
       desc: '被ダメージ軽減',
       apply: (a, s) => { a.incomingDmgMul *= (1 - 0.03 * s); } },
     { key: 'houmu', name: '法務部の守護神', role: 'def', rarity: 'SR', icon: '⚖️', weaponType: 'trap',
-      desc: '配置レーンにトラップを設置。設置数・持続時間もアップ',
+      desc: '出現した列にトラップを設置。設置数・持続時間もアップ',
       apply: (a, s) => { if (s >= 6) a.trapMaxCountBonus = Math.max(a.trapMaxCountBonus, 1); a.trapDurationMul += 0.08 * s; } },
     { key: 'soumu', name: '癒やしの総務女子', role: 'sup', rarity: 'R', icon: '🍵',
       desc: 'HPが少しずつ回復する',
@@ -211,10 +211,10 @@
       desc: '1ステージにつき1回、必殺技発動時に数秒だけ大幅強化される',
       apply: (a, s) => { a.exEmpScale = Math.max(a.exEmpScale, s); } },
     { key: 'gal', name: '水着ギャルエリート', role: 'atk', rarity: 'SSR', icon: '👙', art: ART_GAL, seasonal: '🌺夏季限定', weaponType: 'basic',
-      desc: '配置レーンで「それな」「ASAPで」等のギャル語レーザー連射。陽キャオーラで全体の敵HPもじわじわ削る',
+      desc: '列に出現すると「それな」「ASAPで」等のギャル語レーザー連射。陽キャオーラで全体の敵HPもじわじわ削る',
       apply: (a, s) => { a.allDmgMul += 0.14 * s; a.extraLaneBonus = Math.max(a.extraLaneBonus, s >= 6 ? 1 : 0); a.uwasaDmgPerSec += 1.2 * s; } },
     { key: 'bbq', name: '肉焼き奉行', role: 'atk', rarity: 'SR', icon: '🥩', art: ART_BBQ, seasonal: '🌺夏季限定', weaponType: 'bomb',
-      desc: '配置レーンで熱々の炭を投げて範囲ダメージ。高級和牛パワーで全体攻撃力アップ(その分HPを消費)',
+      desc: '列に出現すると熱々の炭を投げて範囲ダメージ。高級和牛パワーで全体攻撃力アップ(その分HPを消費)',
       apply: (a, s) => { a.bombRadiusMul += 0.10 * s; a.bombDmgMul += 0.14 * s; a.allDmgMul += 0.05 * s; a.hpDrainPerSec += 0.15 * s; } },
   ];
 
@@ -578,7 +578,7 @@
     updateHUD();
   }
 
-  // ---------- ダメージ計算(全武器共通) ----------
+  // ---------- ダメージ計算(全ユニット共通) ----------
   function computeAttackDamage(baseDmg) {
     const pcU = UPGRADES.find((u) => u.key === 'pc');
     const toolU = UPGRADES.find((u) => u.key === 'tool');
@@ -707,10 +707,19 @@
     if (emptyIdx.length === 0) { S.unitSpawnTimer = 600; return; }
     const monitorMul = 1 - Math.min(0.5, upgrades.monitor * 0.12);
     S.unitSpawnTimer = (4000 + Math.random() * 1400) * S.rowSpawnRateMul * monitorMul;
+    // 合体が狙いやすくなるよう、6割の確率で「今すでに列にいるキャラ」と同じものを優先的に出す。
     const pool = spawnPoolKeys();
-    const key = pool[Math.floor(Math.random() * pool.length)];
+    const inRowKeys = S.row.filter((u) => u).map((u) => u.key);
+    let key;
+    if (inRowKeys.length && Math.random() < 0.6) {
+      key = inRowKeys[Math.floor(Math.random() * inRowKeys.length)];
+    } else {
+      key = pool[Math.floor(Math.random() * pool.length)];
+    }
     const idx = emptyIdx[Math.floor(Math.random() * emptyIdx.length)];
-    S.row[idx] = { key, level: 1, timer: 200 };
+    // 所持レベル(ガチャで育てたLv)をそのまま列での初期Lvとして反映する。
+    const owned = roster[key];
+    S.row[idx] = { key, level: owned ? owned.level : 1, timer: 200 };
     spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 28, '新戦力!', '#8fbf6a', 700);
   }
 
@@ -1416,7 +1425,7 @@
         `<div class="roster-item-icon">${iconHtml}</div>` +
         `<div class="roster-item-info">` +
           `<div class="roster-item-name">${owned ? displayCharName(def, owned) : '？？？'}${owned && def.seasonal ? ` <span class="seasonal-badge">${def.seasonal}</span>` : ''}</div>` +
-          `<div class="roster-item-tag">${def.rarity} ${ROLE_LABEL[def.role]}</div>` +
+          `<div class="roster-item-tag">${def.rarity} ${ROLE_LABEL[def.role]} ・ ${def.weaponType ? '<span class="fn-attacker">⚡列で自動攻撃</span>' : '<span class="fn-support">🎗️特性のみ(編成推奨)</span>'}</div>` +
           `<div class="roster-item-desc">${owned ? def.desc : '採用するまで詳細は不明'}</div>` +
         `</div>` +
         `<div class="roster-item-status">${owned ? (inParty ? '✅編成中' : `Lv.${owned.level}(${owned.dupes}人)<br><span class="roster-tap-hint">タップで編成</span>`) : '未採用'}</div>`;

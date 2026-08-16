@@ -398,6 +398,13 @@ button:disabled {
   margin: -4px 0 0;
 }
 
+.roster-party-hint {
+  font-size: 10px;
+  color: var(--color-text-dim);
+  margin: 0;
+  line-height: 1.5;
+}
+
 #roster-gacha-bar {
   display: flex;
   gap: 8px;
@@ -511,6 +518,16 @@ button:disabled {
 .roster-item-tag {
   font-size: 10px;
   color: var(--color-text-dim);
+}
+
+.fn-attacker {
+  color: var(--color-accent);
+  font-weight: bold;
+}
+
+.fn-support {
+  color: #9fd8ff;
+  font-weight: bold;
 }
 
 .roster-item-desc {
