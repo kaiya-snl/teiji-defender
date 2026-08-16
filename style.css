@@ -154,8 +154,11 @@ button:disabled {
 
 /* ---------- プレイ画面 ---------- */
 #screen-playing {
+  display: flex;
+  flex-direction: column;
   padding: 8px;
   gap: 8px;
+  min-height: 100%;
 }
 
 #hud {
@@ -230,7 +233,8 @@ button:disabled {
 
 #game-canvas {
   width: 100%;
-  aspect-ratio: 3 / 4;
+  flex: 1 1 auto;
+  max-height: 480px;
   background: linear-gradient(180deg, #2b3648 0%, #1c2431 100%);
   border-radius: 10px;
   display: block;
@@ -315,6 +319,8 @@ button:disabled {
   display: flex;
   gap: 8px;
   width: 100%;
+  flex-shrink: 0;
+  min-height: 56px;
 }
 
 #btn-ultimate {

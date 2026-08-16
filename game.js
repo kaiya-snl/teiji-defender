@@ -580,7 +580,7 @@
     card.apply();
     EL.levelupModal.classList.add('hidden');
     S.choosingUpgrade = false;
-    spawnFx(S.playerX, PLAYER_Y - 24, `${card.icon}${card.name}!`, '#9fb4ff', 1100);
+    spawnFx(S.playerX, PLAYER_Y - 24, `全体強化${card.icon}${card.name}!`, '#9fb4ff', 1100);
     updateHUD();
   }
 
@@ -599,6 +599,8 @@
 
   function unitLevelCost(u) { return 25 + u.bonusLevel * 18; }
 
+  let unitLevelUpConfirm = -1; // 連続タップでの誤発動を防ぐ
+
   function tryLevelUpUnit(idx) {
     if (S.choosingUpgrade) return;
     const u = S.row[idx];
@@ -606,6 +608,16 @@
     const def = CHARACTERS.find((c) => c.key === u.key);
     if (!def || !def.weaponType) return;
     const cost = unitLevelCost(u);
+
+    // 同じマスを2回タップしたら確定。1回目は表示のみ
+    if (unitLevelUpConfirm !== idx) {
+      unitLevelUpConfirm = idx;
+      spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 30, `💰${cost}で強化？`, '#ffd54f', 1200);
+      setTimeout(() => { unitLevelUpConfirm = -1; }, 1500);
+      return;
+    }
+    unitLevelUpConfirm = -1;
+
     if (S.coins < cost) {
       spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 30, `💰${cost}必要`, '#ff8a8a', 700);
       return;
@@ -640,11 +652,13 @@
     EL.levelupModal.classList.add('hidden');
     S.choosingUpgrade = false;
     const u = S.row[idx];
-    if (!u) return; // 選択中にユニットが消えることは通常ないが念のため
+    if (!u) return;
+    const def = CHARACTERS.find((c) => c.key === u.key);
     u.bonusLevel += 1;
     u.level += 1;
     card.apply(u);
-    spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 30, `${card.icon}Lv${u.level}!`, '#ffd54f', 1100);
+    const unitName = def ? def.name : '不明';
+    spawnFx(ROW_SLOTS[idx].x, ROW_SLOTS[idx].y - 30, `${unitName}${card.icon}Lv${u.level}!`, '#ffd54f', 1100);
     updateHUD();
   }
 
