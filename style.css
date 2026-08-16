@@ -459,6 +459,11 @@ button:disabled {
 
 .roster-item.owned {
   opacity: 1;
+  cursor: pointer;
+}
+
+.roster-item.owned:active {
+  background: #3a4b62;
 }
 
 .roster-item.rarity-SSR { border-left-color: #ffd54f; }
@@ -519,6 +524,12 @@ button:disabled {
   text-align: right;
   color: var(--color-accent);
   white-space: nowrap;
+}
+
+.roster-tap-hint {
+  font-size: 9px;
+  color: var(--color-text-dim);
+  font-weight: normal;
 }
 
 /* ---------- 採用結果(ガチャ演出) ---------- */

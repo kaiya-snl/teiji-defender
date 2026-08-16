@@ -180,7 +180,7 @@
     { key: 'excel', name: 'エクセル職人', role: 'atk', rarity: 'R', icon: '📊',
       desc: 'マクロ爆撃(VBAボム)の範囲・威力アップ',
       apply: (a, s) => { a.bombRadiusMul += 0.08 * s; a.bombDmgMul += 0.10 * s; } },
-    { key: 'typing', name: 'タイピングの鬼', role: 'atk', rarity: 'SSR', icon: '⌨️',
+    { key: 'typing', name: 'タイピングの鬼', role: 'def', rarity: 'SSR', icon: '⌨️',
       desc: '全武器の攻撃力が大幅アップ',
       apply: (a, s) => { a.allDmgMul += 0.10 * s; } },
     { key: 'gorilla', name: '営業のゴリラ', role: 'atk', rarity: 'R', icon: '🦍',
@@ -189,7 +189,7 @@
     { key: 'kikoku', name: '帰国子女エンジニア', role: 'atk', rarity: 'SR', icon: '🌐',
       desc: '「謎のエラー」への特効ダメージ',
       apply: (a, s) => { a.errorDmgMul += 0.25 * s; } },
-    { key: 'legend', name: '伝説の派遣社員', role: 'atk', rarity: 'SSR', icon: '🕶️',
+    { key: 'legend', name: '伝説の派遣社員', role: 'sup', rarity: 'SSR', icon: '🕶️',
       desc: '全武器の攻撃力アップ。ただし編成中は毎秒コインを消費',
       apply: (a, s) => { a.allDmgMul += 0.12 * s; a.coinDrainPerSec += 0.4 * s; } },
     { key: 'otsubone', name: 'ベテランお局様', role: 'def', rarity: 'SR', icon: '👓',
@@ -1083,6 +1083,31 @@
   // ---------- 描画 ----------
   function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
 
+  // 編成中の仲間を自陣（防衛ラインの下）に並べて表示する。
+  // それまでは効果が数値バフのみで画面に一切出てこず「編成しても現れない」との指摘があったため追加。
+  function renderPartyRow() {
+    if (party.length === 0) return;
+    const y = DEFENSE_LINE_Y + 34;
+    const spacing = 32;
+    const startX = CW / 2 - ((party.length - 1) * spacing) / 2;
+    ctx.font = '18px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    party.forEach((key, i) => {
+      const def = CHARACTERS.find((c) => c.key === key);
+      if (!def) return;
+      const x = startX + i * spacing;
+      const bob = Math.sin(performance.now() / 320 + i * 1.7) * 2;
+      ctx.save();
+      ctx.fillStyle = 'rgba(255,255,255,0.10)';
+      circle(x, y + bob, 14);
+      ctx.strokeStyle = 'rgba(255,181,71,0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(x, y + bob, 14, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillText(def.icon, x, y + bob);
+      ctx.restore();
+    });
+  }
+
   function render() {
     ctx.clearRect(0, 0, CW, CH);
     // 縦のレーン区切り線
@@ -1180,6 +1205,8 @@
     ctx.font = '30px sans-serif';
     ctx.fillText('🧑‍💻', 0, 0);
     ctx.restore();
+
+    renderPartyRow();
 
     if (S.bossActive && S.boss) {
       ctx.font = '64px sans-serif';
@@ -1455,13 +1482,22 @@
     renderRoster();
   }
 
+  const RARITY_ORDER = { SSR: 0, SR: 1, R: 2, N: 3 };
+
   function renderRoster() {
     EL.rosterCoins.textContent = S.coins;
     EL.rosterPartyCount.textContent = party.length;
     EL.btnGachaPull.disabled = !GACHA_FREE_TEST && S.coins < GACHA_COST;
     EL.btnGachaPullX10.disabled = !GACHA_FREE_TEST && S.coins < GACHA_COST * 10;
     EL.rosterList.innerHTML = '';
-    for (const def of CHARACTERS) {
+    // 採用済み（レア度が高い順）を先頭にまとめ、未採用は後ろに回す。
+    // ガチャで引いたキャラが「？？？未採用」の下に埋もれて見つからない、という問題への対処。
+    const sorted = CHARACTERS.slice().sort((a, b) => {
+      const ownedA = !!roster[a.key], ownedB = !!roster[b.key];
+      if (ownedA !== ownedB) return ownedA ? -1 : 1;
+      return RARITY_ORDER[a.rarity] - RARITY_ORDER[b.rarity];
+    });
+    for (const def of sorted) {
       const owned = roster[def.key];
       const inParty = party.includes(def.key);
       const div = document.createElement('div');
@@ -1474,7 +1510,7 @@
           `<div class="roster-item-tag">${def.rarity} ${ROLE_LABEL[def.role]}</div>` +
           `<div class="roster-item-desc">${owned ? def.desc : '採用するまで詳細は不明'}</div>` +
         `</div>` +
-        `<div class="roster-item-status">${owned ? (inParty ? '編成中' : `Lv.${owned.level}(${owned.dupes}人)`) : '未採用'}</div>`;
+        `<div class="roster-item-status">${owned ? (inParty ? '✅編成中' : `Lv.${owned.level}(${owned.dupes}人)<br><span class="roster-tap-hint">タップで編成</span>`) : '未採用'}</div>`;
       if (owned) div.addEventListener('click', () => toggleParty(def.key));
       EL.rosterList.appendChild(div);
     }
