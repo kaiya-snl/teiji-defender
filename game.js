@@ -76,12 +76,25 @@
   // ---------- データテーブル ----------
   // speed は縦方向（上→下）の落下速度(px/s)。防衛ラインまでの距離は約440px。
   const ENEMY_TYPES = {
+    // 基本敵（月火水）
     spec:        { emoji: '📧', name: '急な仕様変更',     hp: 18, speed: 90,  dmg: 8,  coin: 4, w: 34 },
-    nagabanashi: { emoji: '🗣️', name: '上司の長話',       hp: 70, speed: 35,  dmg: 16, coin: 14, w: 38 },
-    error:       { emoji: '❓', name: '謎のエラー',       hp: 26, speed: 120, dmg: 10, coin: 7, w: 32, zigzag: true },
     denwa:       { emoji: '☎️', name: '鳴り止まない電話', hp: 12, speed: 100, dmg: 6,  coin: 3, w: 30 },
     cc:          { emoji: '📩', name: 'CC祭りメール',     hp: 6,  speed: 70,  dmg: 3,  coin: 2, w: 26 },
+    // 中堅敵（火水木）
+    error:       { emoji: '❓', name: '謎のエラー',       hp: 26, speed: 120, dmg: 10, coin: 7, w: 32, zigzag: true },
     kaigi:       { emoji: '📅', name: '至急ミーティング', hp: 34, speed: 25,  dmg: 12, coin: 6, w: 34 },
+    nagabanashi: { emoji: '🗣️', name: '上司の長話',       hp: 70, speed: 35,  dmg: 16, coin: 14, w: 38 },
+    // 上級敵（木金）
+    keiyaku:     { emoji: '📜', name: '複雑な契約書',     hp: 48, speed: 20,  dmg: 18, coin: 10, w: 40 },
+    jishin:      { emoji: '🌀', name: '地震情報',         hp: 40, speed: 110, dmg: 12, coin: 9, w: 36, range_attack: true },
+    pawaham:     { emoji: '🔴', name: 'パワハラ上司',     hp: 55, speed: 30,  dmg: 24, coin: 15, w: 42 },
+    // 複雑敵（金）
+    zenin:       { emoji: '👥', name: '全員に返信',       hp: 8,  speed: 80,  dmg: 4,  coin: 2, w: 24, multi: 3 },
+    kangyoushoku: { emoji: '💼', name: '完業職',          hp: 38, speed: 40,  dmg: 14, coin: 8, w: 36 },
+    houkoku:     { emoji: '📢', name: '報告ラッシュ',     hp: 15, speed: 95,  dmg: 7,  coin: 4, w: 28 },
+    jikantakushoku: { emoji: '⚡', name: '短時間営業',    hp: 10, speed: 130, dmg: 5,  coin: 3, w: 26 },
+    shoriairon:  { emoji: '⏳', name: '処理中…',          hp: 32, speed: 50,  dmg: 11, coin: 6, w: 32 },
+    netsuabuse:  { emoji: '🌡️', name: 'ネッサブ投稿',    hp: 20, speed: 110, dmg: 9,  coin: 5, w: 30 },
   };
 
   const ITEM_TYPES = {
@@ -227,10 +240,10 @@
     name: '帰り際の上司',
     baseHp: 480,
     phases: [
-      { kind: 'rush',     hpAbove: 0.7,  line: 'あ、ちょっといい? 5分だけいい?',                 interval: 900, dmg: 5 },
-      { kind: 'summon',   hpAbove: 0.4,  line: 'これ、一旦みんなで集まって認識合わせしよっか', count: 4 },
+      { kind: 'rush',     hpAbove: 0.7,  line: 'あ、ちょっといい? 5分だけいい?',                 interval: 900, dmg: 5, accel: 0.9 },
+      { kind: 'summon',   hpAbove: 0.4,  line: 'これ、一旦みんなで集まって認識合わせしよっか', count: 4, types: ['error', 'kaigi', 'nagabanashi', 'keiyaku'] },
       { kind: 'lecture',  hpAbove: 0.15, line: 'いや、そもそも論になっちゃうんだけどさ' },
-      { kind: 'finisher', hpAbove: 0,    line: 'これ、土曜出社とかできたりする…よね?',           dmg: 40 },
+      { kind: 'finisher', hpAbove: 0,    line: 'これ、土曜出社とかできたりする…よね?',           dmg: 40, waves: 3 },
     ],
     defeatLine: '（真顔で）……了解、お疲れ様。良い週末を。',
   };
@@ -405,6 +418,7 @@
     S.maxHp += Math.round(S.partyAgg.maxHpBonus);
     S.hp = S.maxHp;
     deploySquad();
+    S.waves = generateWaves(S.day);
     S.waveIndex = 0;
     S.waveTimer = 0;
     S.waveActive = false;
@@ -488,6 +502,7 @@
       speed: def.speed * spMul * extraMul, dmg: def.dmg, coin: def.coin, w: def.w,
       zigzag: !!def.zigzag, zigT: Math.random() * Math.PI * 2, flash: 0,
       slowUntil: 0, slowMul: 1,
+      range_attack: !!def.range_attack, multi: def.multi || 1,
     });
   }
 
@@ -497,19 +512,42 @@
     }
   }
 
-  // ウェーブ構成（敵タイプ・数）
-  const WAVES = [
-    [{ key: 'denwa', count: 2 }, { key: 'cc', count: 3 }],
-    [{ key: 'spec', count: 4 }, { key: 'cc', count: 2 }],
-    [{ key: 'nagabanashi', count: 1 }],
-    [{ key: 'error', count: 2 }, { key: 'spec', count: 3 }],
-    [{ key: 'kaigi', count: 2 }, { key: 'nagabanashi', count: 1 }],
-    [{ key: 'spec', count: 5 }, { key: 'error', count: 1 }],
-  ];
+  // ウェーブ生成（難度対応・毎回異なる敵構成）
+  function generateWaves(dayIndex) {
+    const basicPool = ['spec', 'denwa', 'cc'];
+    const midPool = ['error', 'kaigi', 'nagabanashi'];
+    const advPool = ['keiyaku', 'jishin', 'pawaham'];
+    const complexPool = ['zenin', 'kangyoushoku', 'houkoku', 'jikantakushoku', 'shoriairon', 'netsuabuse'];
+
+    let availablePool = [...basicPool];
+    if (dayIndex >= 1) availablePool = availablePool.concat(midPool);
+    if (dayIndex >= 3) availablePool = availablePool.concat(advPool);
+    if (dayIndex >= 4) availablePool = availablePool.concat(complexPool);
+
+    const waves = [];
+    for (let w = 0; w < 6; w++) {
+      const waveNum = w + 1;
+      const enemyCount = 2 + waveNum + Math.floor(dayIndex * 1.5);
+      const wave = [];
+
+      // 1波: 敵少数・単一タイプ、6波: 敵多数・混合
+      const numEnemyTypes = w === 0 ? 1 : Math.min(2 + Math.floor(w / 2), 3);
+      let remaining = enemyCount;
+
+      for (let i = 0; i < numEnemyTypes && remaining > 0; i++) {
+        const key = availablePool[Math.floor(Math.random() * availablePool.length)];
+        const count = i === numEnemyTypes - 1 ? remaining : Math.max(1, Math.floor(remaining / (numEnemyTypes - i)));
+        wave.push({ key, count });
+        remaining -= count;
+      }
+      waves.push(wave);
+    }
+    return waves;
+  }
 
   function startNextWave() {
-    if (S.waveIndex >= WAVES.length) return; // 全波終了
-    const wave = WAVES[S.waveIndex];
+    if (S.waveIndex >= S.waves.length) return; // 全波終了
+    const wave = S.waves[S.waveIndex];
     wave.forEach((spawn) => {
       setTimeout(() => {
         for (let i = 0; i < spawn.count; i++) {
@@ -966,11 +1004,25 @@
       return;
     }
     if (p.kind === 'rush') {
-      if (b.timer >= p.interval) { b.timer = 0; applyDamageToPlayer(p.dmg); }
-    } else if (p.kind === 'finisher' && !b.finisherDone && b.timer >= 2200) {
-      b.finisherDone = true;
-      if (performance.now() < S.invincibleUntil) spawnFx(CW / 2, 60, '無効化！', '#8fe3ff', 1000);
-      else applyDamageToPlayer(p.dmg);
+      const accel = p.accel || 1;
+      const currentInterval = p.interval * Math.pow(accel, Math.floor(b.timer / 3000));
+      if (b.timer >= currentInterval) { b.timer = 0; applyDamageToPlayer(p.dmg); }
+    } else if (p.kind === 'summon' && !b.summonDone && b.timer >= 800) {
+      b.summonDone = true;
+      const enemyTypes = p.types || ['error', 'kaigi', 'spec'];
+      for (let i = 0; i < (p.count || 3); i++) {
+        const key = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+        setTimeout(() => { if (S.bossActive) spawnOne(key); }, i * 300);
+      }
+    } else if (p.kind === 'finisher') {
+      const waveCount = p.waves || 1;
+      for (let w = 0; w < waveCount; w++) {
+        if (!b.finisherDone && b.timer >= 800 + w * 1400) {
+          b.finisherDone = true;
+          if (performance.now() < S.invincibleUntil) spawnFx(CW / 2, 60, '無効化！', '#8fe3ff', 1000);
+          else applyDamageToPlayer(p.dmg);
+        }
+      }
     }
   }
 
@@ -1224,13 +1276,33 @@
 
     for (const e of S.entities) {
       ctx.save();
+      const etype = ENEMY_TYPES[e.key];
+      const isRangeAttack = etype.range_attack;
+      const isMulti = etype.multi;
+
       if (e.flash > 0) ctx.filter = 'brightness(1.8)';
       if (e.slowUntil && performance.now() < e.slowUntil) ctx.globalAlpha = 0.75;
+
+      // 属性表現：範囲攻撃は赤枠、複数敵は背景
+      if (isRangeAttack) {
+        ctx.strokeStyle = 'rgba(255,100,100,0.8)';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(e.x, e.y, 20, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (isMulti) {
+        ctx.fillStyle = 'rgba(200,180,100,0.15)';
+        ctx.fillRect(e.x - 16, e.y - 16, 32, 32);
+      }
+
       ctx.font = '28px sans-serif';
-      ctx.fillText(ENEMY_TYPES[e.key].emoji, e.x, e.y);
+      ctx.fillText(etype.emoji, e.x, e.y);
       ctx.restore();
+
+      // HP バー
       ctx.fillStyle = '#000a'; ctx.fillRect(e.x - e.w / 2, e.y - 24, e.w, 5);
-      ctx.fillStyle = '#e05252'; ctx.fillRect(e.x - e.w / 2, e.y - 24, e.w * Math.max(0, e.hp / e.maxHp), 5);
+      ctx.fillStyle = isRangeAttack ? '#ff6b6b' : '#e05252';
+      ctx.fillRect(e.x - e.w / 2, e.y - 24, e.w * Math.max(0, e.hp / e.maxHp), 5);
     }
 
     // 弾
