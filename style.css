@@ -391,6 +391,421 @@ button:disabled {
   font-weight: bold;
 }
 
+/* ---------- 仲間編成・採用(ガチャ) ---------- */
+.roster-party-count {
+  font-size: 12px;
+  color: var(--color-text-dim);
+  margin: -4px 0 0;
+}
+
+#roster-gacha-bar {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+#roster-gacha-bar button {
+  font-size: 13px;
+  padding: 12px 8px;
+}
+
+.roster-rate-note {
+  font-size: 10px;
+  color: var(--color-text-dim);
+  margin: 0;
+}
+
+.roster-test-note {
+  font-size: 11px;
+  color: #ffd54f;
+  margin: -2px 0 0;
+}
+
+#roster-gacha-bar button {
+  line-height: 1.5;
+}
+
+.gacha-btn-sub {
+  font-size: 10px;
+  font-weight: normal;
+  opacity: 0.85;
+}
+
+.gacha-x10 {
+  background: linear-gradient(135deg, #c792ea, #7aa2ff);
+  color: #150022;
+}
+
+#roster-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.roster-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-panel-light);
+  border-radius: 10px;
+  padding: 8px 10px;
+  border-left: 4px solid #666;
+  text-align: left;
+  opacity: 0.5;
+}
+
+.roster-item.owned {
+  opacity: 1;
+}
+
+.roster-item.rarity-SSR { border-left-color: #ffd54f; }
+.roster-item.rarity-SR { border-left-color: #c792ea; }
+.roster-item.rarity-R { border-left-color: #7aa2ff; }
+.roster-item.rarity-N { border-left-color: #8a97a8; }
+
+.roster-item.in-party {
+  outline: 2px solid var(--color-accent);
+}
+
+.roster-item-icon {
+  font-size: 24px;
+  flex: 0 0 auto;
+  width: 30px;
+  text-align: center;
+}
+
+.roster-item-icon svg {
+  width: 30px;
+  height: 30px;
+  display: block;
+}
+
+.seasonal-badge {
+  font-size: 9px;
+  font-weight: normal;
+  color: #ff9ec4;
+  background: rgba(255,92,138,0.15);
+  border-radius: 4px;
+  padding: 1px 4px;
+  vertical-align: middle;
+}
+
+.roster-item-info {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.roster-item-name {
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.roster-item-tag {
+  font-size: 10px;
+  color: var(--color-text-dim);
+}
+
+.roster-item-desc {
+  font-size: 10px;
+  color: var(--color-text-dim);
+}
+
+.roster-item-status {
+  flex: 0 0 auto;
+  font-size: 11px;
+  text-align: right;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+/* ---------- 採用結果(ガチャ演出) ---------- */
+#gacha-result-modal, #gacha-result-x10-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 95;
+  overflow: hidden;
+}
+
+#gacha-result-modal.hidden, #gacha-result-x10-modal.hidden {
+  display: none;
+}
+
+#gacha-result-rays, #gacha-result-x10-rays {
+  position: absolute;
+  width: 200vmax;
+  height: 200vmax;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.08) 8deg, transparent 16deg, transparent 40deg, rgba(255,255,255,0.08) 48deg, transparent 56deg, transparent 80deg, rgba(255,255,255,0.08) 88deg, transparent 96deg);
+  animation: gachaRaySpin 12s linear infinite;
+}
+
+@keyframes gachaRaySpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+#gacha-result-box {
+  position: relative;
+  background: #111;
+  border: 2px solid var(--color-accent);
+  border-radius: 14px;
+  padding: 28px 24px;
+  text-align: center;
+  width: 260px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+#gacha-result-box.revealing #gacha-result-rarity,
+#gacha-result-box.revealing #gacha-result-name,
+#gacha-result-box.revealing #gacha-result-note,
+#gacha-result-box.revealing #btn-gacha-result-close {
+  visibility: hidden;
+}
+
+#gacha-result-box.revealing #gacha-result-icon::before {
+  content: '？';
+}
+
+#gacha-result-box.revealing #gacha-result-icon {
+  font-size: 0;
+}
+
+#gacha-result-box.revealing #gacha-result-icon::before {
+  font-size: 46px;
+  display: inline-block;
+  animation: gachaSpin 0.5s linear infinite;
+}
+
+@keyframes gachaSpin {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.25) rotate(180deg); }
+}
+
+#gacha-result-box.rar-N { border-color: #8a97a8; }
+#gacha-result-box.rar-R { border-color: #7aa2ff; box-shadow: 0 0 24px rgba(122,162,255,0.5); }
+#gacha-result-box.rar-SR { border-color: #c792ea; box-shadow: 0 0 32px rgba(199,146,234,0.65); }
+#gacha-result-box.rar-SR.pop { animation: gachaPulse 1s ease-in-out infinite; }
+#gacha-result-box.rar-SSR { border-color: #ffd54f; box-shadow: 0 0 48px rgba(255,213,79,0.85); }
+#gacha-result-box.rar-SSR.pop { animation: gachaPulseGold 0.6s ease-in-out infinite; }
+
+@keyframes gachaPulse {
+  0%, 100% { box-shadow: 0 0 24px rgba(199,146,234,0.5); }
+  50% { box-shadow: 0 0 40px rgba(199,146,234,0.9); }
+}
+
+@keyframes gachaPulseGold {
+  0%, 100% { box-shadow: 0 0 32px rgba(255,213,79,0.6); transform: scale(1); }
+  50% { box-shadow: 0 0 60px rgba(255,213,79,1); transform: scale(1.03); }
+}
+
+/* SSR/SRの「溜め」演出（サスペンス中に光が強まっていく） */
+#gacha-result-box.charging-SR {
+  animation: gachaChargeSR 1.1s ease-in forwards;
+}
+@keyframes gachaChargeSR {
+  0% { box-shadow: 0 0 14px rgba(199,146,234,0.35); transform: scale(1); }
+  100% { box-shadow: 0 0 64px rgba(199,146,234,0.95); transform: scale(1.05); }
+}
+#gacha-result-box.charging-SSR {
+  animation: gachaChargeSSR 1.8s ease-in forwards;
+}
+@keyframes gachaChargeSSR {
+  0% { box-shadow: 0 0 14px rgba(255,213,79,0.3); transform: scale(1) rotate(0deg); }
+  60% { box-shadow: 0 0 60px rgba(255,213,79,0.8); }
+  100% { box-shadow: 0 0 100px rgba(255,213,79,1); transform: scale(1.08) rotate(0deg); }
+}
+
+/* 開示の瞬間のポップ演出 */
+#gacha-result-box.pop {
+  animation: gachaRevealPop 0.5s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes gachaRevealPop {
+  0% { transform: scale(0.7); }
+  55% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+#gacha-result-box.shake {
+  animation: gachaShake 0.45s ease-in-out;
+}
+@keyframes gachaShake {
+  0%, 100% { transform: translate(0,0); }
+  15% { transform: translate(-7px, 4px); }
+  30% { transform: translate(7px, -4px); }
+  45% { transform: translate(-6px, 5px); }
+  60% { transform: translate(6px, -3px); }
+  75% { transform: translate(-3px, 2px); }
+}
+
+/* 画面全体フラッシュ・紙吹雪パーティクル(SSR/SR専用) */
+.gacha-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+  opacity: 0;
+}
+.gacha-flash.playing.flash-gold {
+  background: radial-gradient(circle, rgba(255,232,150,0.95), rgba(255,213,79,0.4) 45%, transparent 75%);
+  animation: gachaFlashPop 0.55s ease-out;
+}
+.gacha-flash.playing.flash-purple {
+  background: radial-gradient(circle, rgba(230,198,255,0.85), rgba(199,146,234,0.3) 45%, transparent 75%);
+  animation: gachaFlashPop 0.5s ease-out;
+}
+@keyframes gachaFlashPop {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.gacha-particle {
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 150;
+  animation: gachaParticleFly 1s ease-out forwards;
+}
+@keyframes gachaParticleFly {
+  0% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2) rotate(200deg); opacity: 0; }
+}
+
+#gacha-result-rarity {
+  font-weight: bold;
+  font-size: 14px;
+  color: var(--color-accent);
+  margin: 0;
+  letter-spacing: 2px;
+}
+
+#gacha-result-icon {
+  font-size: 46px;
+  margin: 8px 0;
+}
+
+#gacha-result-icon svg {
+  width: 84px;
+  height: 84px;
+  display: block;
+  margin: 0 auto;
+}
+
+#gacha-result-name {
+  font-weight: bold;
+  font-size: 16px;
+  margin: 0 0 6px;
+}
+
+#gacha-result-note {
+  font-size: 12px;
+  color: var(--color-text-dim);
+  margin: 0 0 16px;
+}
+
+/* ---------- 採用結果(10連) ---------- */
+#gacha-result-x10-box {
+  position: relative;
+  background: #111;
+  border: 2px solid var(--color-accent);
+  border-radius: 14px;
+  padding: 20px;
+  text-align: center;
+  width: min(92vw, 380px);
+  max-height: 88vh;
+  overflow-y: auto;
+}
+
+.gacha-x10-summary {
+  font-size: 13px;
+  color: var(--color-accent);
+  font-weight: bold;
+  margin: 0 0 10px;
+}
+
+#gacha-x10-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.gacha-x10-card {
+  background: var(--color-panel-light);
+  border-radius: 8px;
+  padding: 8px 2px;
+  border: 2px solid #666;
+  opacity: 0;
+  transform: scale(0.5);
+  animation: gachaCardIn 0.35s ease-out forwards;
+}
+
+@keyframes gachaCardIn {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.gacha-x10-card.rar-N { border-color: #8a97a8; }
+.gacha-x10-card.rar-R { border-color: #7aa2ff; }
+.gacha-x10-card.rar-SR {
+  border-color: #c792ea;
+  box-shadow: 0 0 10px rgba(199,146,234,0.6);
+  animation: gachaCardIn 0.35s ease-out forwards, gachaCardPulseSR 1.3s ease-in-out infinite;
+}
+.gacha-x10-card.rar-SSR {
+  border-color: #ffd54f;
+  background: linear-gradient(120deg, var(--color-panel-light) 30%, rgba(255,213,79,0.6) 50%, var(--color-panel-light) 70%);
+  background-size: 300% 100%;
+  animation: gachaCardIn 0.35s ease-out forwards, gachaCardShimmer 1.4s linear infinite, gachaCardPulseSSR 0.8s ease-in-out infinite;
+}
+@keyframes gachaCardPulseSR {
+  0%, 100% { box-shadow: 0 0 8px rgba(199,146,234,0.5); }
+  50% { box-shadow: 0 0 18px rgba(199,146,234,0.95); }
+}
+@keyframes gachaCardPulseSSR {
+  0%, 100% { box-shadow: 0 0 12px rgba(255,213,79,0.7); }
+  50% { box-shadow: 0 0 26px rgba(255,213,79,1); }
+}
+@keyframes gachaCardShimmer {
+  0% { background-position: -150% 0; }
+  100% { background-position: 250% 0; }
+}
+
+.gacha-x10-card-icon {
+  font-size: 20px;
+}
+
+.gacha-x10-card-icon svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+  margin: 0 auto;
+}
+
+.gacha-x10-card-rarity {
+  font-size: 9px;
+  font-weight: bold;
+  color: var(--color-text-dim);
+}
+
+.gacha-x10-card.rar-SSR .gacha-x10-card-rarity { color: #ffd54f; }
+.gacha-x10-card.rar-SR .gacha-x10-card-rarity { color: #c792ea; }
+
+.gacha-x10-card-name {
+  font-size: 8px;
+  line-height: 1.2;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
 /* ---------- 結果画面共通 ---------- */
 .result-line {
   font-size: 15px;

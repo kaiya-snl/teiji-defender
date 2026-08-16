@@ -32,7 +32,19 @@
     btnRetryDay: $('btn-retry-day'), btnGameoverTitle: $('btn-gameover-title'),
     adRewardModal: $('ad-reward-modal'), adRewardCountdown: $('ad-reward-countdown'),
     levelupModal: $('levelup-modal'), levelupChoices: $('levelup-choices'),
+    btnOpenRosterTitle: $('btn-open-roster-title'), btnOpenRosterPause: $('btn-open-roster-pause'),
+    rosterCoins: $('roster-coins'), rosterPartyCount: $('roster-party-count'), rosterList: $('roster-list'),
+    btnGachaPull: $('btn-gacha-pull'), btnGachaPullX10: $('btn-gacha-pull-x10'),
+    btnGachaAd: $('btn-gacha-ad'), btnRosterClose: $('btn-roster-close'),
+    gachaResultModal: $('gacha-result-modal'), gachaResultBox: $('gacha-result-box'),
+    gachaResultRarity: $('gacha-result-rarity'),
+    gachaResultIcon: $('gacha-result-icon'), gachaResultName: $('gacha-result-name'),
+    gachaResultNote: $('gacha-result-note'), btnGachaResultClose: $('btn-gacha-result-close'),
+    gachaResultX10Modal: $('gacha-result-x10-modal'), gachaX10Summary: $('gacha-x10-summary'),
+    gachaX10Grid: $('gacha-x10-grid'), btnGachaX10Close: $('btn-gacha-x10-close'),
   };
+
+  const GACHA_FREE_TEST = true; // テスト版のため、ガチャのコイン消費を一時的に無効化
 
   const ctx = EL.canvas.getContext('2d');
   const CW = 360, CH = 480, COLS = 3, COL_W = CW / COLS;
@@ -120,6 +132,117 @@
     { icon: '🛡️', name: 'シールド', desc: '次に受けるダメージを1回だけ無効化する(重複可)', apply: () => { S.runBuffs.shield += 1; } },
   ];
 
+  // ---------- 仲間(社員)システム: 20種、採用ガチャで収集し最大5人編成 ----------
+  // apply(a, s): 編成中の効果を集計オブジェクト a に加算/乗算する。s はダブり数から算出したレベル倍率。
+  const GACHA_COST = 40; // コインガチャ1回のコスト
+  const ROLE_LABEL = { atk: '⚔️アタッカー', def: '🛡️ディフェンダー', sup: '💖サポーター', trick: '🃏トリックスター' };
+  // 季節限定キャラ用の自作SVGアイコン（外部画像を使わず自前で描画）
+  const ART_GAL =
+    '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M20 72 Q14 50 30 44 L36 76 Q26 80 20 72 Z" fill="#1a1a1a"/>' +
+    '<path d="M80 72 Q86 50 70 44 L64 76 Q74 80 80 72 Z" fill="#1a1a1a"/>' +
+    '<ellipse cx="50" cy="56" rx="15" ry="19" fill="#f0b088"/>' +
+    '<path d="M37 60 L50 67 L63 60 L58 74 L42 74 Z" fill="#ff5c8a"/>' +
+    '<line x1="45" y1="47" x2="43" y2="60" stroke="#ccc" stroke-width="1.5"/>' +
+    '<rect x="39" y="58" width="8" height="10" rx="1" fill="#fff" stroke="#ddd"/>' +
+    '<circle cx="50" cy="31" r="17" fill="#f7c199"/>' +
+    '<path d="M32 29 Q27 8 50 7 Q73 8 68 29 Q71 45 62 41 Q67 24 50 21 Q33 24 38 41 Q29 45 32 29 Z" fill="#4a2c1e"/>' +
+    '<path d="M60 13 Q71 17 66 30" fill="none" stroke="#d8ad63" stroke-width="3" stroke-linecap="round"/>' +
+    '<rect x="36" y="8" width="11" height="7" rx="3" fill="#222"/>' +
+    '<rect x="53" y="8" width="11" height="7" rx="3" fill="#222"/>' +
+    '<line x1="47" y1="11" x2="53" y2="11" stroke="#222" stroke-width="2"/>' +
+    '<circle cx="32" cy="35" r="2.4" fill="#ffd54f"/>' +
+    '<circle cx="68" cy="35" r="2.4" fill="#ffd54f"/>' +
+    '<circle cx="44" cy="33" r="1.6" fill="#333"/><circle cx="56" cy="33" r="1.6" fill="#333"/>' +
+    '<path d="M45 39 Q50 43 55 39" stroke="#333" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+    '</svg>';
+  const ART_BBQ =
+    '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M30 56 Q50 49 70 56 L76 92 L24 92 Z" fill="#d9502a"/>' +
+    '<path d="M42 56 L45 48 L55 48 L58 56 Z" fill="#c2431f"/>' +
+    '<path d="M42 49 L50 58 L58 49 L54 45 L46 45 Z" fill="#fff"/>' +
+    '<path d="M48 51 L52 51 L54 68 L50 74 L46 68 Z" fill="#2c3e6b"/>' +
+    '<circle cx="50" cy="31" r="17" fill="#e8ab7a"/>' +
+    '<path d="M33 27 Q31 10 50 10 Q69 10 67 27 Q67 18 50 18 Q33 18 33 27 Z" fill="#2b2118"/>' +
+    '<rect x="32" y="18" width="36" height="6" fill="#c0392b"/>' +
+    '<line x1="39" y1="37" x2="43" y2="40" stroke="#333" stroke-width="2" stroke-linecap="round"/>' +
+    '<line x1="59" y1="36" x2="62" y2="39" stroke="#333" stroke-width="1.5" stroke-linecap="round"/>' +
+    '<circle cx="44" cy="32" r="1.6" fill="#222"/><circle cx="56" cy="32" r="1.6" fill="#222"/>' +
+    '<path d="M44 39 Q50 44 56 39" stroke="#222" stroke-width="1.8" fill="none" stroke-linecap="round"/>' +
+    '<path d="M78 52 L90 42 M78 58 L92 53" stroke="#8a8a8a" stroke-width="3" stroke-linecap="round" fill="none"/>' +
+    '<circle cx="14" cy="80" r="5" fill="#ff9a3c"/><circle cx="20" cy="86" r="3.5" fill="#ffb35c"/>' +
+    '</svg>';
+
+  const CHARACTERS = [
+    { key: 'ace', name: '新人エース', role: 'atk', rarity: 'SR', icon: '🌱',
+      desc: '攻撃速度アップ。稀に攻撃が敵を回復させてしまう',
+      apply: (a, s) => { a.basicFireRateMul *= (1 - 0.05 * s); a.whiffHealChance += 0.015 * s; } },
+    { key: 'excel', name: 'エクセル職人', role: 'atk', rarity: 'R', icon: '📊',
+      desc: 'マクロ爆撃(VBAボム)の範囲・威力アップ',
+      apply: (a, s) => { a.bombRadiusMul += 0.08 * s; a.bombDmgMul += 0.10 * s; } },
+    { key: 'typing', name: 'タイピングの鬼', role: 'atk', rarity: 'SSR', icon: '⌨️',
+      desc: '全武器の攻撃力が大幅アップ',
+      apply: (a, s) => { a.allDmgMul += 0.10 * s; } },
+    { key: 'gorilla', name: '営業のゴリラ', role: 'atk', rarity: 'R', icon: '🦍',
+      desc: 'ちゃぶ台返しウェーブの威力・頻度アップ',
+      apply: (a, s) => { a.knockDistMul += 0.10 * s; a.knockIntervalMul *= (1 - 0.06 * s); } },
+    { key: 'kikoku', name: '帰国子女エンジニア', role: 'atk', rarity: 'SR', icon: '🌐',
+      desc: '「謎のエラー」への特効ダメージ',
+      apply: (a, s) => { a.errorDmgMul += 0.25 * s; } },
+    { key: 'legend', name: '伝説の派遣社員', role: 'atk', rarity: 'SSR', icon: '🕶️',
+      desc: '全武器の攻撃力アップ。ただし編成中は毎秒コインを消費',
+      apply: (a, s) => { a.allDmgMul += 0.12 * s; a.coinDrainPerSec += 0.4 * s; } },
+    { key: 'otsubone', name: 'ベテランお局様', role: 'def', rarity: 'SR', icon: '👓',
+      desc: '「リスケ」フリーズの発動間隔短縮・完全停止確率アップ',
+      apply: (a, s) => { a.freezeIntervalMul *= (1 - 0.06 * s); a.freezeChanceBonus += 0.03 * s; } },
+    { key: 'sekinin', name: '責任逃れの上司', role: 'def', rarity: 'R', icon: '🙈',
+      desc: '被弾を確率で丸ごとブロック',
+      apply: (a, s) => { a.blockChance += 0.02 * s; } },
+    { key: 'madogiwa', name: '窓際族の妖精', role: 'def', rarity: 'N', icon: '🧚',
+      desc: '最大HPアップ',
+      apply: (a, s) => { a.maxHpBonus += 12 * s; } },
+    { key: 'claim', name: 'クレーム対応のプロ', role: 'def', rarity: 'R', icon: '📞',
+      desc: '被ダメージ軽減',
+      apply: (a, s) => { a.incomingDmgMul *= (1 - 0.03 * s); } },
+    { key: 'houmu', name: '法務部の守護神', role: 'def', rarity: 'SR', icon: '⚖️',
+      desc: 'アウトソーシングの設置数・持続時間アップ',
+      apply: (a, s) => { if (s >= 6) a.trapMaxCountBonus = Math.max(a.trapMaxCountBonus, 1); a.trapDurationMul += 0.08 * s; } },
+    { key: 'soumu', name: '癒やしの総務女子', role: 'sup', rarity: 'R', icon: '🍵',
+      desc: 'HPが少しずつ回復する',
+      apply: (a, s) => { a.hpRegenPerSec += 0.3 * s; } },
+    { key: 'keiri', name: '経理の鬼', role: 'sup', rarity: 'SR', icon: '🧮',
+      desc: 'コイン獲得量アップ',
+      apply: (a, s) => { a.coinMul += 0.08 * s; } },
+    { key: 'dash', name: '定時ダッシュ勢', role: 'sup', rarity: 'N', icon: '🏃',
+      desc: '定時間際(残り時間わずか)で攻撃速度が爆発的アップ',
+      apply: (a, s) => { a.dashScale = Math.max(a.dashScale, s); } },
+    { key: 'comm', name: 'コミュ力お化け', role: 'sup', rarity: 'R', icon: '💬',
+      desc: '必殺技ゲージが早く貯まる',
+      apply: (a, s) => { a.ultGaugeMul += 0.10 * s; } },
+    { key: 'inu', name: '社長の愛犬', role: 'sup', rarity: 'N', icon: '🐕',
+      desc: 'HPがほんの少しずつ回復する',
+      apply: (a, s) => { a.hpRegenPerSec += 0.08 * s; } },
+    { key: 'neet', name: '社内ニート', role: 'trick', rarity: 'N', icon: '😴',
+      desc: '普段は何もしないが、ごく稀に本気を出して画面の敵を一掃する',
+      apply: (a, s) => { a.neetTriggerPerSec += 0.003 * s; },
+      evoNames: ['社内ニート', '一般社員', '中堅エース', '一家に一台AI Master'], evoThresholds: [1, 11, 21, 31] },
+    { key: 'uwasa', name: 'うわさ好きの社員', role: 'trick', rarity: 'R', icon: '🗯️',
+      desc: '敵同士に噂話を流し、じわじわ同士討ちさせる',
+      apply: (a, s) => { a.uwasaDmgPerSec += 0.6 * s; } },
+    { key: 'power', name: 'パワハラ部長', role: 'trick', rarity: 'SR', icon: '😠',
+      desc: '全員の攻撃力を上げるが、編成中は自分のHPが徐々に減る諸刃の剣',
+      apply: (a, s) => { a.allDmgMul += 0.15 * s; a.hpDrainPerSec += 0.25 * s; } },
+    { key: 'exemp', name: '辞めた優秀な元社員', role: 'trick', rarity: 'R', icon: '🚪',
+      desc: '1ステージにつき1回、必殺技発動時に数秒だけ大幅強化される',
+      apply: (a, s) => { a.exEmpScale = Math.max(a.exEmpScale, s); } },
+    { key: 'gal', name: '水着ギャルエリート', role: 'atk', rarity: 'SSR', icon: '👙', art: ART_GAL, seasonal: '🌺夏季限定',
+      desc: '「それな」「ASAPで」等のギャル語レーザーで超広範囲を攻撃。陽キャオーラで敵のHPをじわじわ削る',
+      apply: (a, s) => { a.allDmgMul += 0.14 * s; a.extraLaneBonus = Math.max(a.extraLaneBonus, s >= 6 ? 1 : 0); a.uwasaDmgPerSec += 1.2 * s; } },
+    { key: 'bbq', name: '肉焼き奉行', role: 'atk', rarity: 'SR', icon: '🥩', art: ART_BBQ, seasonal: '🌺夏季限定',
+      desc: '熱々の炭を投げて範囲ダメージ。高級和牛パワーで攻撃力アップ(その分HPを消費)',
+      apply: (a, s) => { a.bombRadiusMul += 0.10 * s; a.bombDmgMul += 0.14 * s; a.allDmgMul += 0.05 * s; a.hpDrainPerSec += 0.15 * s; } },
+  ];
+
   const MONITOR_EXTRA = [0, 1, 2, 2]; // デュアルモニターLv→ブラインドタッチ弾への常時追加レーン数
   const FIRE_OFFSET_SETS = [[0], [0, 1], [0, -1, 1]]; // COLS=3を前提とした発射レーンオフセット(単位:COL_W)
 
@@ -171,7 +294,33 @@
   let monthIndex = 0; // 0=4月 ... 11=3月（現在地・セーブされる）
   let weekInMonth = 0; // 0-3（現在地・セーブされる）
   let bestTotalWeek = 0; // 到達済みの最高週数（1〜48）
+  let roster = {}; // 採用済み社員 { key: { dupes, level } }
+  let party = []; // 編成中の社員key（最大5）
+  let rosterReturn = 'title';
   let bossLineTimeout = null;
+
+  function freshPartyAggregate() {
+    return {
+      allDmgMul: 0, basicFireRateMul: 1, incomingDmgMul: 1, coinMul: 0, ultGaugeMul: 0,
+      hpRegenPerSec: 0, maxHpBonus: 0, freezeIntervalMul: 1, freezeChanceBonus: 0,
+      bombRadiusMul: 0, bombDmgMul: 0, knockDistMul: 0, knockIntervalMul: 1,
+      trapMaxCountBonus: 0, trapDurationMul: 0, errorDmgMul: 0,
+      blockChance: 0, whiffHealChance: 0, neetTriggerPerSec: 0, uwasaDmgPerSec: 0,
+      coinDrainPerSec: 0, hpDrainPerSec: 0, dashScale: 0, exEmpScale: 0, extraLaneBonus: 0,
+    };
+  }
+
+  function computePartyAggregate() {
+    const agg = freshPartyAggregate();
+    for (const key of party) {
+      const owned = roster[key];
+      const def = CHARACTERS.find((c) => c.key === key);
+      if (!owned || !def) continue;
+      const scale = 1 + (owned.level - 1) * 0.12;
+      def.apply(agg, scale);
+    }
+    return agg;
+  }
 
   function totalWeekNow() { return monthIndex * 4 + weekInMonth; }
   function difficultyFactor() { return totalWeekNow() + S.day / 5; }
@@ -196,6 +345,7 @@
       runLevel: 1, runExp: 0, choosingUpgrade: false,
       weapons: { basic: { level: 1, timer: 300 } },
       runBuffs: { critBonus: 0, coinMul: 1, pickupRange: 0, shield: 0 },
+      partyAgg: freshPartyAggregate(), exEmpUsed: false, exEmpUntil: 0,
     };
   }
   S = freshState();
@@ -213,6 +363,10 @@
       const wi = localStorage.getItem('tdd_week');
       monthIndex = mi ? Math.min(MONTH_NAMES.length - 1, Math.max(0, parseInt(mi, 10) || 0)) : 0;
       weekInMonth = wi ? Math.min(3, Math.max(0, parseInt(wi, 10) || 0)) : 0;
+      const r = localStorage.getItem('tdd_roster');
+      if (r) roster = JSON.parse(r);
+      const p = localStorage.getItem('tdd_party');
+      if (p) party = JSON.parse(p);
     } catch (e) {
       console.warn('セーブデータの読み込みに失敗しました（プライベートブラウズ等の可能性）', e);
     }
@@ -224,6 +378,8 @@
       localStorage.setItem('tdd_bestweek', String(bestTotalWeek));
       localStorage.setItem('tdd_month', String(monthIndex));
       localStorage.setItem('tdd_week', String(weekInMonth));
+      localStorage.setItem('tdd_roster', JSON.stringify(roster));
+      localStorage.setItem('tdd_party', JSON.stringify(party));
     } catch (e) {
       console.warn('セーブデータの保存に失敗しました', e);
     }
@@ -265,6 +421,9 @@
     S.day = day;
     S.isExtraStage = extra;
     if (extra) S.stageDuration = 42000; // 休日出勤は短いが苛烈
+    S.partyAgg = computePartyAggregate();
+    S.maxHp += Math.round(S.partyAgg.maxHpBonus);
+    S.hp = S.maxHp;
     EL.bossDialogue.classList.add('hidden');
     EL.btnLectureSkip.classList.add('hidden');
     EL.levelupModal.classList.add('hidden');
@@ -458,7 +617,8 @@
   function computeAttackDamage(baseDmg) {
     const pcU = UPGRADES.find((u) => u.key === 'pc');
     const toolU = UPGRADES.find((u) => u.key === 'tool');
-    let dmg = baseDmg + upgrades.pc * pcU.effectPerLv;
+    let dmg = (baseDmg + upgrades.pc * pcU.effectPerLv) * (1 + S.partyAgg.allDmgMul);
+    if (S.exEmpUntil && performance.now() < S.exEmpUntil) dmg *= (1 + S.partyAgg.exEmpScale);
     const critChance = Math.min(80, upgrades.tool * toolU.effectPerLv + S.runBuffs.critBonus);
     let crit = false;
     if (Math.random() * 100 < critChance) { dmg *= 2; crit = true; }
@@ -468,9 +628,9 @@
   function killEnemy(e) {
     let coin = e.coin;
     if (performance.now() < S.coinBoostUntil) coin *= 2;
-    coin = Math.round(coin * S.runBuffs.coinMul);
+    coin = Math.round(coin * S.runBuffs.coinMul * (1 + S.partyAgg.coinMul));
     S.coins += coin; S.runCoins += coin;
-    S.ultGauge = Math.min(100, S.ultGauge + 8);
+    S.ultGauge = Math.min(100, S.ultGauge + 8 * (1 + S.partyAgg.ultGaugeMul));
     spawnFx(e.x, e.y, `+${coin}💰`, '#ffd54f');
     S.entities = S.entities.filter((x) => x !== e);
     grantExp(e.coin);
@@ -478,6 +638,13 @@
   }
 
   function hitEnemy(e, baseDmg) {
+    if (S.partyAgg.whiffHealChance > 0 && Math.random() < S.partyAgg.whiffHealChance) {
+      const heal = Math.round(baseDmg * 0.5);
+      e.hp = Math.min(e.maxHp, e.hp + heal);
+      spawnFx(e.x, e.y - 16, `+${heal}回復…`, '#8fbf6a');
+      return;
+    }
+    if (e.key === 'error') baseDmg *= (1 + S.partyAgg.errorDmgMul);
     const { dmg, crit } = computeAttackDamage(baseDmg);
     e.hp -= dmg; e.flash = 120;
     spawnFx(e.x, e.y - 16, crit ? `会心!-${dmg}` : `-${dmg}`, crit ? '#ffdd55' : '#fff');
@@ -496,6 +663,11 @@
 
   function applyDamageToPlayer(dmg) {
     if (performance.now() < S.invincibleUntil) return;
+    if (S.partyAgg.blockChance > 0 && Math.random() < S.partyAgg.blockChance) {
+      spawnFx(S.playerX, PLAYER_Y - 30, '部下に丸投げ!', '#8fbf6a', 700);
+      return;
+    }
+    dmg = Math.round(dmg * S.partyAgg.incomingDmgMul);
     if (S.runBuffs.shield > 0) {
       S.runBuffs.shield -= 1;
       spawnFx(S.playerX, PLAYER_Y - 30, 'シールド防御!', '#8fe3ff', 700);
@@ -514,6 +686,11 @@
     S.invincibleUntil = performance.now() + 5000;
     for (const e of S.entities) { const c = Math.ceil(e.coin / 2); S.coins += c; S.runCoins += c; }
     S.entities = [];
+    if (S.partyAgg.exEmpScale > 0 && !S.exEmpUsed) {
+      S.exEmpUsed = true;
+      S.exEmpUntil = performance.now() + 5000;
+      spawnFx(CW / 2, CH / 2 - 40, '助っ人参上!!', '#ff8fd6', 1200);
+    }
     spawnFx(CW / 2, CH / 2, 'ショートカットキー全開放!!', '#ffd54f', 1200);
     updateHUD();
   }
@@ -529,13 +706,18 @@
   function basicFireOffsets(lv) {
     const fromWeapon = lv >= 7 ? 2 : lv >= 4 ? 1 : 0;
     const fromMonitor = MONITOR_EXTRA[Math.min(upgrades.monitor, 3)];
-    const extra = Math.min(COLS - 1, fromWeapon + fromMonitor);
+    const fromParty = S.partyAgg.extraLaneBonus;
+    const extra = Math.min(COLS - 1, fromWeapon + fromMonitor + fromParty);
     return FIRE_OFFSET_SETS[extra].map((n) => n * COL_W);
   }
 
   function updateWeaponBasic(dt) {
     const w = S.weapons.basic;
-    const interval = Math.max(70, 340 - w.level * 27);
+    let fireRateMul = S.partyAgg.basicFireRateMul;
+    if (S.partyAgg.dashScale > 0 && !S.isExtraStage && S.elapsed / S.stageDuration > 0.7) {
+      fireRateMul *= Math.max(0.3, 1 - 0.5 * S.partyAgg.dashScale);
+    }
+    const interval = Math.max(50, (340 - w.level * 27) * fireRateMul);
     S.laserActive = interval <= 110;
     w.timer -= dt;
     if (w.timer <= 0) {
@@ -569,8 +751,8 @@
     const interval = Math.max(900, 2200 - w.level * 120);
     if (w.timer <= 0) {
       w.timer = interval;
-      const dmgBase = 12 + w.level * 5;
-      const radius = 45 + w.level * 9;
+      const dmgBase = (12 + w.level * 5) * (1 + S.partyAgg.bombDmgMul);
+      const radius = (45 + w.level * 9) * (1 + S.partyAgg.bombRadiusMul);
       S.bombs.push({ x: S.playerX, y: PLAYER_Y - 18, dmgBase, radius });
     }
     for (let i = S.bombs.length - 1; i >= 0; i--) {
@@ -628,11 +810,11 @@
     const w = S.weapons.trap;
     if (w) {
       w.timer -= dt;
-      const maxCount = Math.min(4, 1 + Math.floor(w.level / 3));
+      const maxCount = Math.min(5, 1 + Math.floor(w.level / 3) + S.partyAgg.trapMaxCountBonus);
       if (w.timer <= 0 && S.traps.length < maxCount) {
         w.timer = 1200;
         const lane = Math.floor(Math.random() * COLS);
-        const dur = 4000 + w.level * 500;
+        const dur = (4000 + w.level * 500) * (1 + S.partyAgg.trapDurationMul);
         S.traps.push({ x: lane * COL_W + COL_W / 2, y: 95, life: dur, maxLife: dur, tickTimer: 0, dmg: 4 + w.level * 1.5 });
       }
     }
@@ -653,11 +835,11 @@
     const w = S.weapons.freeze;
     if (!w) return;
     w.timer -= dt;
-    const interval = Math.max(1200, 2600 - w.level * 100);
+    const interval = Math.max(600, (2600 - w.level * 100) * S.partyAgg.freezeIntervalMul);
     if (w.timer <= 0) {
       w.timer = interval;
       const targetCount = Math.min(3, 1 + Math.floor(w.level / 4));
-      const freezeChance = w.level >= 10 ? 0.8 : w.level >= 8 ? 0.4 : 0;
+      const freezeChance = Math.min(1, (w.level >= 10 ? 0.8 : w.level >= 8 ? 0.4 : 0) + S.partyAgg.freezeChanceBonus);
       const front = S.entities.slice().sort((a, b) => b.y - a.y).slice(0, targetCount);
       for (const e of front) {
         const full = Math.random() < freezeChance;
@@ -672,10 +854,10 @@
     const w = S.weapons.knock;
     if (!w) return;
     w.timer -= dt;
-    const interval = Math.max(1000, 3200 - w.level * 220);
+    const interval = Math.max(500, (3200 - w.level * 220) * S.partyAgg.knockIntervalMul);
     if (w.timer <= 0) {
       w.timer = interval;
-      const dist = 60 + w.level * 18;
+      const dist = (60 + w.level * 18) * (1 + S.partyAgg.knockDistMul);
       for (const e of S.entities) {
         if (e.y > 130) e.y = Math.max(20, e.y - dist);
       }
@@ -691,6 +873,26 @@
     updateWeaponTrap(dt);
     updateWeaponFreeze(dt);
     updateWeaponKnock(dt);
+  }
+
+  // ---------- 編成中の仲間による継続効果(回復/コイン消費/HP消費/社内ニート発動/うわさ話) ----------
+  function updatePartyTicks(dt) {
+    const a = S.partyAgg;
+    if (a.hpRegenPerSec > 0 && S.hp < S.maxHp) S.hp = Math.min(S.maxHp, S.hp + a.hpRegenPerSec * dt / 1000);
+    if (a.hpDrainPerSec > 0) S.hp = Math.max(1, S.hp - a.hpDrainPerSec * dt / 1000); // 部長のせいでも0にはしない
+    if (a.coinDrainPerSec > 0) S.coins = Math.max(0, S.coins - a.coinDrainPerSec * dt / 1000);
+    if (a.neetTriggerPerSec > 0 && S.entities.length > 0 && Math.random() < a.neetTriggerPerSec * dt / 1000) {
+      spawnFx(CW / 2, CH / 2, '社内ニート、本気を出す!!', '#ffd54f', 1400);
+      for (const e of S.entities) { const c = Math.ceil(e.coin / 2); S.coins += c; S.runCoins += c; }
+      S.entities = [];
+    }
+    if (a.uwasaDmgPerSec > 0) {
+      for (const e of S.entities.slice()) {
+        e.hp -= a.uwasaDmgPerSec * dt / 1000;
+        if (e.hp <= 0) killEnemy(e);
+      }
+    }
+    if (a.hpRegenPerSec > 0 || a.hpDrainPerSec > 0 || a.coinDrainPerSec > 0) updateHUD();
   }
 
   // ---------- ボス ----------
@@ -813,6 +1015,7 @@
 
     if (S.playerRecoil > 0) S.playerRecoil -= dt;
     updateWeapons(dt);
+    updatePartyTicks(dt);
 
     const slow = performance.now() < S.slowUntil ? S.slowFactor : 1;
     for (let i = S.entities.length - 1; i >= 0; i--) {
@@ -1074,7 +1277,9 @@
   }
   function closeShop() {
     S.state = S.shopReturn;
-    showScreen(S.shopReturn === 'playing' ? 'screen-playing' : S.shopReturn === 'pause' ? 'screen-pause' : 'screen-title');
+    if (S.shopReturn === 'playing') showScreen('screen-playing');
+    else if (S.shopReturn === 'pause') showScreen('screen-pause');
+    else goTitle();
   }
   function renderShop() {
     EL.shopCoins.textContent = S.coins;
@@ -1112,8 +1317,181 @@
     updateHUD();
   }
 
+  // ---------- 仲間編成・採用ガチャ ----------
+  function displayCharName(def, owned) {
+    if (!owned) return def.name;
+    if (def.evoNames) {
+      let idx = 0;
+      for (let i = 0; i < def.evoThresholds.length; i++) { if (owned.dupes >= def.evoThresholds[i]) idx = i; }
+      return def.evoNames[idx];
+    }
+    return def.name + (owned.level >= def.maxLv || owned.level >= 10 ? '★' : '');
+  }
+
+  function pullGacha() {
+    const r = Math.random() * 100;
+    const rarity = r < 2.5 ? 'SSR' : r < 25 ? (Math.random() < 0.5 ? 'SR' : 'R') : 'N';
+    const pool = CHARACTERS.filter((c) => c.rarity === rarity);
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    const owned = roster[picked.key];
+    let isNew = false;
+    if (!owned) {
+      roster[picked.key] = { dupes: 1, level: 1 };
+      isNew = true;
+    } else {
+      owned.dupes += 1;
+      owned.level = Math.min(10, owned.level + 1);
+    }
+    saveProgress();
+    return { picked, isNew, dupes: roster[picked.key].dupes };
+  }
+
+  // レア度が高いほど「溜め」を長くし、開示の瞬間の演出を派手にする
+  const RARITY_REVEAL_DELAY = { SSR: 1800, SR: 1100, R: 480, N: 320 };
+  const RARITY_PARTICLE_COLORS = {
+    SSR: ['#ffd54f', '#fff2b0', '#ffb300', '#ffffff'],
+    SR: ['#c792ea', '#e6c6ff', '#9b5fd1', '#ffffff'],
+  };
+
+  function spawnGachaParticles(count, colors) {
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('div');
+      p.className = 'gacha-particle';
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 70 + Math.random() * 160;
+      p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+      p.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.animationDelay = `${Math.random() * 150}ms`;
+      document.body.appendChild(p);
+      setTimeout(() => p.remove(), 1300);
+    }
+  }
+
+  function flashScreen(variant) {
+    const f = document.createElement('div');
+    f.className = `gacha-flash playing ${variant}`;
+    document.body.appendChild(f);
+    setTimeout(() => f.remove(), 650);
+  }
+
+  function showGachaResult(result) {
+    const owned = roster[result.picked.key];
+    const rarity = result.picked.rarity;
+    EL.gachaResultRarity.textContent = result.picked.seasonal ? `${rarity}　${result.picked.seasonal}` : rarity;
+    if (result.picked.art) EL.gachaResultIcon.innerHTML = result.picked.art;
+    else EL.gachaResultIcon.textContent = result.picked.icon;
+    EL.gachaResultName.textContent = displayCharName(result.picked, owned);
+    EL.gachaResultNote.textContent = result.isNew ? '新しく採用しました！' : `重複採用(${result.dupes}人目) → Lv.${owned.level}に強化`;
+    EL.gachaResultBox.className = `revealing rar-${rarity}`;
+    if (rarity === 'SSR' || rarity === 'SR') EL.gachaResultBox.classList.add(`charging-${rarity}`);
+    EL.gachaResultModal.classList.remove('hidden');
+    setTimeout(() => {
+      EL.gachaResultBox.classList.remove('revealing', 'charging-SSR', 'charging-SR');
+      EL.gachaResultBox.classList.add('pop');
+      if (rarity === 'SSR') {
+        flashScreen('flash-gold');
+        spawnGachaParticles(30, RARITY_PARTICLE_COLORS.SSR);
+        EL.gachaResultBox.classList.add('shake');
+      } else if (rarity === 'SR') {
+        flashScreen('flash-purple');
+        spawnGachaParticles(16, RARITY_PARTICLE_COLORS.SR);
+      }
+    }, RARITY_REVEAL_DELAY[rarity] || 400);
+  }
+
+  function doGachaPull(free) {
+    if (!free && !GACHA_FREE_TEST) {
+      if (S.coins < GACHA_COST) return;
+      S.coins -= GACHA_COST;
+      saveProgress();
+    }
+    showGachaResult(pullGacha());
+    renderRoster();
+    updateHUD();
+  }
+
+  function doGachaPullX10() {
+    if (!GACHA_FREE_TEST && S.coins < GACHA_COST * 10) return;
+    if (!GACHA_FREE_TEST) { S.coins -= GACHA_COST * 10; saveProgress(); }
+    const results = [];
+    for (let i = 0; i < 10; i++) results.push(pullGacha());
+    const counts = { SSR: 0, SR: 0, R: 0, N: 0 };
+    EL.gachaX10Grid.innerHTML = '';
+    results.forEach((res, i) => {
+      counts[res.picked.rarity] += 1;
+      const owned = roster[res.picked.key];
+      const card = document.createElement('div');
+      card.className = `gacha-x10-card rar-${res.picked.rarity}`;
+      card.style.animationDelay = `${i * 60}ms`;
+      card.innerHTML =
+        `<div class="gacha-x10-card-icon">${res.picked.art || res.picked.icon}</div>` +
+        `<div class="gacha-x10-card-rarity">${res.picked.rarity}</div>` +
+        `<div class="gacha-x10-card-name">${displayCharName(res.picked, owned)}</div>`;
+      EL.gachaX10Grid.appendChild(card);
+    });
+    EL.gachaX10Summary.textContent = `SSR×${counts.SSR}　SR×${counts.SR}　R×${counts.R}　N×${counts.N}`;
+    EL.gachaResultX10Modal.classList.remove('hidden');
+    if (counts.SSR > 0) {
+      setTimeout(() => {
+        flashScreen('flash-gold');
+        spawnGachaParticles(24 + counts.SSR * 10, RARITY_PARTICLE_COLORS.SSR);
+      }, 300);
+    } else if (counts.SR > 0) {
+      setTimeout(() => {
+        flashScreen('flash-purple');
+        spawnGachaParticles(14, RARITY_PARTICLE_COLORS.SR);
+      }, 300);
+    }
+    renderRoster();
+    updateHUD();
+  }
+
+  function toggleParty(key) {
+    const idx = party.indexOf(key);
+    if (idx >= 0) party.splice(idx, 1);
+    else { if (party.length >= 5) return; party.push(key); }
+    saveProgress();
+    renderRoster();
+  }
+
+  function renderRoster() {
+    EL.rosterCoins.textContent = S.coins;
+    EL.rosterPartyCount.textContent = party.length;
+    EL.btnGachaPull.disabled = !GACHA_FREE_TEST && S.coins < GACHA_COST;
+    EL.btnGachaPullX10.disabled = !GACHA_FREE_TEST && S.coins < GACHA_COST * 10;
+    EL.rosterList.innerHTML = '';
+    for (const def of CHARACTERS) {
+      const owned = roster[def.key];
+      const inParty = party.includes(def.key);
+      const div = document.createElement('div');
+      div.className = `roster-item rarity-${def.rarity}${owned ? ' owned' : ''}${inParty ? ' in-party' : ''}`;
+      const iconHtml = owned ? (def.art || def.icon) : '❔';
+      div.innerHTML =
+        `<div class="roster-item-icon">${iconHtml}</div>` +
+        `<div class="roster-item-info">` +
+          `<div class="roster-item-name">${owned ? displayCharName(def, owned) : '？？？'}${owned && def.seasonal ? ` <span class="seasonal-badge">${def.seasonal}</span>` : ''}</div>` +
+          `<div class="roster-item-tag">${def.rarity} ${ROLE_LABEL[def.role]}</div>` +
+          `<div class="roster-item-desc">${owned ? def.desc : '採用するまで詳細は不明'}</div>` +
+        `</div>` +
+        `<div class="roster-item-status">${owned ? (inParty ? '編成中' : `Lv.${owned.level}(${owned.dupes}人)`) : '未採用'}</div>`;
+      if (owned) div.addEventListener('click', () => toggleParty(def.key));
+      EL.rosterList.appendChild(div);
+    }
+  }
+
+  function openRoster(returnTo) {
+    rosterReturn = returnTo;
+    renderRoster();
+    showScreen('screen-roster');
+  }
+  function closeRoster() {
+    if (rosterReturn === 'pause') showScreen('screen-pause');
+    else goTitle();
+  }
+
   // ---------- リワード広告シミュレーション ----------
-  function watchAdContinue() {
+  function playRewardAdThen(onComplete) {
     EL.adRewardModal.classList.remove('hidden');
     let count = 5;
     EL.adRewardCountdown.textContent = String(count);
@@ -1123,12 +1501,18 @@
       if (count <= 0) {
         clearInterval(timer);
         EL.adRewardModal.classList.add('hidden');
-        S.hp = Math.round(S.maxHp * 0.5);
-        S.state = 'playing';
-        showScreen('screen-playing');
-        updateHUD();
+        onComplete();
       }
     }, 1000);
+  }
+
+  function watchAdContinue() {
+    playRewardAdThen(() => {
+      S.hp = Math.round(S.maxHp * 0.5);
+      S.state = 'playing';
+      showScreen('screen-playing');
+      updateHUD();
+    });
   }
 
   // ---------- イベント登録 ----------
@@ -1138,6 +1522,14 @@
   EL.btnOpenShop.addEventListener('click', () => openShop('playing'));
   EL.btnOpenShopPause.addEventListener('click', () => openShop('pause'));
   EL.btnShopClose.addEventListener('click', closeShop);
+  EL.btnOpenRosterTitle.addEventListener('click', () => openRoster('title'));
+  EL.btnOpenRosterPause.addEventListener('click', () => openRoster('pause'));
+  EL.btnRosterClose.addEventListener('click', closeRoster);
+  EL.btnGachaPull.addEventListener('click', () => doGachaPull(false));
+  EL.btnGachaPullX10.addEventListener('click', doGachaPullX10);
+  EL.btnGachaAd.addEventListener('click', () => playRewardAdThen(() => doGachaPull(true)));
+  EL.btnGachaResultClose.addEventListener('click', () => EL.gachaResultModal.classList.add('hidden'));
+  EL.btnGachaX10Close.addEventListener('click', () => EL.gachaResultX10Modal.classList.add('hidden'));
   EL.btnPause.addEventListener('click', () => { S.state = 'pause'; showScreen('screen-pause'); });
   EL.btnResume.addEventListener('click', () => { S.state = 'playing'; showScreen('screen-playing'); });
   EL.btnQuitTitle.addEventListener('click', goTitle);

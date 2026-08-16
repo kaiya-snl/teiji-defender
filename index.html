@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>定時退社ディフェンダー</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -27,6 +27,7 @@
         <span id="title-coins">所持コイン: 0</span>
       </div>
       <button id="btn-open-shop-title" class="btn-secondary">強化画面へ</button>
+      <button id="btn-open-roster-title" class="btn-secondary">仲間編成・採用</button>
     </div>
 
     <!-- ===== ステージ開始演出 ===== -->
@@ -85,11 +86,28 @@
       <button id="btn-shop-close" class="btn-primary">閉じる</button>
     </div>
 
+    <!-- ===== 仲間編成・採用（ガチャ） ===== -->
+    <div id="screen-roster" class="screen hidden">
+      <h2>仲間編成・採用</h2>
+      <p class="shop-coins">所持コイン: <span id="roster-coins">0</span> 💰</p>
+      <p class="roster-party-count">出撃メンバー: <span id="roster-party-count">0</span>/5（タップで編成/解除）</p>
+      <p class="roster-test-note">🔧 テスト版のため、ガチャは今だけ無料・無制限で回せます</p>
+      <div id="roster-gacha-bar">
+        <button id="btn-gacha-pull" class="btn-primary">採用面接する<br><span class="gacha-btn-sub">1回（無料・テスト版）</span></button>
+        <button id="btn-gacha-pull-x10" class="btn-primary gacha-x10">10連採用面接<br><span class="gacha-btn-sub">10回（無料・テスト版）</span></button>
+      </div>
+      <button id="btn-gacha-ad" class="btn-secondary">広告を見て1回引く（演出確認用）</button>
+      <p class="roster-rate-note">排出率: SSR 2.5% / SR・R 22.5% / N 75%（同じ社員を10人集めると昇格）</p>
+      <div id="roster-list"></div>
+      <button id="btn-roster-close" class="btn-primary">閉じる</button>
+    </div>
+
     <!-- ===== 一時停止 ===== -->
     <div id="screen-pause" class="screen hidden">
       <h2>一時停止中</h2>
       <button id="btn-resume" class="btn-primary">再開する</button>
       <button id="btn-open-shop-pause" class="btn-secondary">強化画面へ</button>
+      <button id="btn-open-roster-pause" class="btn-secondary">仲間編成・採用</button>
       <button id="btn-quit-title" class="btn-secondary">タイトルへ戻る</button>
     </div>
 
@@ -132,6 +150,29 @@
     </div>
   </div>
 
+  <!-- ===== 採用結果発表（ガチャ演出モーダル・1連） ===== -->
+  <div id="gacha-result-modal" class="hidden">
+    <div id="gacha-result-rays"></div>
+    <div id="gacha-result-box">
+      <p id="gacha-result-rarity">SSR</p>
+      <p id="gacha-result-icon">💼</p>
+      <p id="gacha-result-name">新人エース</p>
+      <p id="gacha-result-note"></p>
+      <button id="btn-gacha-result-close" class="btn-primary">閉じる</button>
+    </div>
+  </div>
+
+  <!-- ===== 採用結果発表（ガチャ演出モーダル・10連） ===== -->
+  <div id="gacha-result-x10-modal" class="hidden">
+    <div id="gacha-result-x10-rays"></div>
+    <div id="gacha-result-x10-box">
+      <h3>10連採用結果</h3>
+      <p id="gacha-x10-summary" class="gacha-x10-summary"></p>
+      <div id="gacha-x10-grid"></div>
+      <button id="btn-gacha-x10-close" class="btn-primary">閉じる</button>
+    </div>
+  </div>
+
   <!-- ===== リワード広告シミュレーション（モーダル） =====
        実際の広告SDK（Google AdMob/AdSense向けの動画広告タグ等）に
        差し替える想定のプレースホルダー。演出のみ実装。 -->
@@ -146,6 +187,6 @@
   <!-- ===== 広告枠（下部バナー） ===== -->
   <div id="ad-bottom" class="ad-slot">広告枠（下部バナー / ここに AdSense 等のタグを設置）</div>
 
-  <script src="game.js"></script>
+  <script src="game.js?v=5"></script>
 </body>
 </html>
