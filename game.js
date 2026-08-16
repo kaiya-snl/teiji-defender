@@ -430,6 +430,8 @@
     S.state = 'playing';
     showScreen('screen-playing');
     updateHUD();
+    // 敵出現テスト用
+    setTimeout(() => { if (S.state === 'playing') spawnOne('spec'); }, 1000);
   }
 
   // ---------- HUD ----------
