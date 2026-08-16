@@ -1236,17 +1236,14 @@
     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     for (let i = 1; i < COLS; i++) { ctx.beginPath(); ctx.moveTo(i * COL_W, 0); ctx.lineTo(i * COL_W, CH); ctx.stroke(); }
 
-    // 防衛ライン（ここを越えられるとダメージ）。自キャラはもう戦わないので、
-    // 帯は「ここが境界」とわかる程度の細さに抑え、下の空間を広く取らない。
-    ctx.fillStyle = 'rgba(255,181,71,0.12)';
-    ctx.fillRect(0, DEFENSE_LINE_Y, CW, Math.min(36, CH - DEFENSE_LINE_Y));
+    // 防衛ライン（ここを越えられるとダメージ）
     ctx.strokeStyle = 'rgba(255,181,71,0.9)';
     ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(0, DEFENSE_LINE_Y); ctx.lineTo(CW, DEFENSE_LINE_Y); ctx.stroke();
     ctx.lineWidth = 1;
-    ctx.fillStyle = 'rgba(255,181,71,0.9)';
-    ctx.font = '11px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-    ctx.fillText('防衛ライン（自分の陣地）', 6, DEFENSE_LINE_Y + 4);
+    ctx.fillStyle = 'rgba(255,181,71,0.7)';
+    ctx.font = '10px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText('防衛ライン', 6, DEFENSE_LINE_Y + 3);
 
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
