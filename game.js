@@ -495,7 +495,7 @@
     const spMul = 1 + Math.min(1.4, df * 0.028);
     const extraMul = S.isExtraStage ? 1.35 : 1;
     S.entities.push({
-      key, lane, x: lane * COL_W + COL_W / 2, y: -24,
+      key, lane, x: lane * COL_W + COL_W / 2, y: 60,
       hp: Math.round(def.hp * hpMul * extraMul), maxHp: Math.round(def.hp * hpMul * extraMul),
       speed: def.speed * spMul * extraMul, dmg: def.dmg, coin: def.coin, w: def.w,
       zigzag: !!def.zigzag, zigT: Math.random() * Math.PI * 2, flash: 0,
