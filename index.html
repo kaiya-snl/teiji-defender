@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>定時退社ディフェンダー</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== 広告枠（上部バナー） =====
+       ここに Google AdSense 等の広告タグを設置する。
+       実際に広告を出すには広告ネットワークの審査・自分の広告主IDが必要なため、
+       現状はプレースホルダー表示のみ。 -->
+  <div id="ad-top" class="ad-slot">広告枠（上部バナー / ここに AdSense 等のタグを設置）</div>
+
+  <div id="app">
+
+    <!-- ===== タイトル画面 ===== -->
+    <div id="screen-title" class="screen">
+      <h1>定時退社ディフェンダー</h1>
+      <p class="tagline">迫りくる理不尽な業務から、あなたのメンタルを守り抜け。</p>
+      <p class="desc">月〜金、5日分のステージ。金曜日には最大の脅威が待ち受ける……</p>
+      <button id="btn-start" class="btn-primary">出社する（スタート）</button>
+      <div class="title-sub">
+        <span id="title-bestday">最高記録: -</span>
+        <span id="title-coins">所持コイン: 0</span>
+      </div>
+      <button id="btn-open-shop-title" class="btn-secondary">強化画面へ</button>
+    </div>
+
+    <!-- ===== ステージ開始演出 ===== -->
+    <div id="screen-stage-intro" class="screen hidden">
+      <h2 id="stage-intro-day">月曜日</h2>
+      <p id="stage-intro-msg">今日も一日、乗り切ろう。</p>
+      <button id="btn-stage-go" class="btn-primary">業務開始</button>
+    </div>
+
+    <!-- ===== ゲーム本体 ===== -->
+    <div id="screen-playing" class="screen hidden">
+
+      <!-- HUD -->
+      <div id="hud">
+        <div class="hud-row">
+          <div class="hud-item" id="hud-day">月曜日</div>
+          <div class="hud-item" id="hud-clock">9:00</div>
+          <div class="hud-item" id="hud-coins">💰0</div>
+        </div>
+        <div class="hp-bar-outer">
+          <div id="hp-bar-inner"></div>
+          <span id="hp-bar-label">HP 100/100</span>
+        </div>
+        <div id="loadout-row"></div>
+      </div>
+
+      <canvas id="game-canvas"></canvas>
+
+      <!-- ボスの吹き出し -->
+      <div id="boss-dialogue" class="hidden">
+        <div id="boss-dialogue-name"></div>
+        <div id="boss-dialogue-text"></div>
+      </div>
+
+      <!-- 説教スクロール中に連打するボタン（ボス専用ギミック） -->
+      <button id="btn-lecture-skip" class="hidden">はい、すみません（連打）</button>
+
+      <!-- 下部操作バー -->
+      <div id="action-bar">
+        <button id="btn-ultimate" disabled>
+          <span class="ult-name">有給休暇の発動</span>
+          <span class="ult-gauge-outer"><span id="ult-gauge-inner"></span></span>
+        </button>
+        <button id="btn-open-shop">強化</button>
+        <button id="btn-pause">一時停止</button>
+      </div>
+    </div>
+
+    <!-- ===== 強化ショップ（モーダル） ===== -->
+    <div id="screen-shop" class="screen hidden">
+      <h2>強化ショップ</h2>
+      <p class="shop-coins">所持コイン: <span id="shop-coins">0</span> 💰</p>
+      <div id="shop-list"></div>
+      <button id="btn-shop-close" class="btn-primary">閉じる</button>
+    </div>
+
+    <!-- ===== 一時停止 ===== -->
+    <div id="screen-pause" class="screen hidden">
+      <h2>一時停止中</h2>
+      <button id="btn-resume" class="btn-primary">再開する</button>
+      <button id="btn-open-shop-pause" class="btn-secondary">強化画面へ</button>
+      <button id="btn-quit-title" class="btn-secondary">タイトルへ戻る</button>
+    </div>
+
+    <!-- ===== ステージクリア ===== -->
+    <div id="screen-stage-clear" class="screen hidden">
+      <h2>定時退社成功！</h2>
+      <p id="stage-clear-msg">お疲れ様でした。</p>
+      <p class="result-line">獲得コイン: <span id="clear-coins">0</span> 💰</p>
+      <button id="btn-next-day" class="btn-primary">次の日へ</button>
+    </div>
+
+    <!-- ===== 週間クリア（真のエンディング） ===== -->
+    <div id="screen-all-clear" class="screen hidden">
+      <h2>今週の定時退社、達成！</h2>
+      <p>金曜日の「帰り際の上司」を退けた……あなたはもう戦士だ。</p>
+      <p class="result-line">総獲得コイン: <span id="allclear-coins">0</span> 💰</p>
+      <button id="btn-restart-week" class="btn-primary">また来週も戦う（最初から）</button>
+    </div>
+
+    <!-- ===== ゲームオーバー ===== -->
+    <div id="screen-gameover" class="screen hidden">
+      <h2>残業確定……</h2>
+      <p id="gameover-msg">メンタルが尽きてしまった。</p>
+      <button id="btn-watch-ad-continue" class="btn-primary">
+        広告を見て続きから（HP半分回復）
+      </button>
+      <button id="btn-retry-day" class="btn-secondary">この日からリトライ</button>
+      <button id="btn-gameover-title" class="btn-secondary">タイトルへ戻る</button>
+    </div>
+
+  </div>
+
+  <!-- ===== リワード広告シミュレーション（モーダル） =====
+       実際の広告SDK（Google AdMob/AdSense向けの動画広告タグ等）に
+       差し替える想定のプレースホルダー。演出のみ実装。 -->
+  <div id="ad-reward-modal" class="hidden">
+    <div id="ad-reward-box">
+      <p>広告再生中……</p>
+      <p class="ad-reward-note">（実際の広告SDKに差し替える枠。現在はシミュレーションです）</p>
+      <p id="ad-reward-countdown">5</p>
+    </div>
+  </div>
+
+  <!-- ===== 広告枠（下部バナー） ===== -->
+  <div id="ad-bottom" class="ad-slot">広告枠（下部バナー / ここに AdSense 等のタグを設置）</div>
+
+  <script src="game.js"></script>
+</body>
+</html>
