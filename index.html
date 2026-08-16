@@ -44,12 +44,14 @@
         <div class="hud-row">
           <div class="hud-item" id="hud-day">月曜日</div>
           <div class="hud-item" id="hud-clock">9:00</div>
+          <div class="hud-item" id="hud-level">Lv.1</div>
           <div class="hud-item" id="hud-coins">💰0</div>
         </div>
         <div class="hp-bar-outer">
           <div id="hp-bar-inner"></div>
           <span id="hp-bar-label">HP 100/100</span>
         </div>
+        <div class="exp-bar-outer"><div id="exp-bar-inner"></div></div>
         <div id="loadout-row"></div>
       </div>
 
@@ -118,6 +120,16 @@
       <button id="btn-gameover-title" class="btn-secondary">タイトルへ戻る</button>
     </div>
 
+  </div>
+
+  <!-- ===== レベルアップ選択（モーダル） =====
+       ステージ内限定の一時強化。HOMEのコイン強化（恒常）とは別枠。 -->
+  <div id="levelup-modal" class="hidden">
+    <div id="levelup-box">
+      <h3>レベルアップ！</h3>
+      <p class="levelup-sub">1つ選んで強化しよう</p>
+      <div id="levelup-choices"></div>
+    </div>
   </div>
 
   <!-- ===== リワード広告シミュレーション（モーダル） =====
